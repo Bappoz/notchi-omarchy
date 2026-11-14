@@ -291,11 +291,15 @@ def world_clocks():
 
 
 def status():
+    migration_warning=''
+    try:migrate_timer()
+    except (OSError,ValueError,subprocess.SubprocessError):
+        migration_warning='Timer migration pending; the saved reminder will be retried.'
     state = read_json(STATE/'state.json', {}) or {}
     if not isinstance(state,dict):state={}
     if not isinstance(state.get('shelf',[]),list):state['shelf']=[]
     power = batteries()
-    return {'metrics': metrics(), 'batteries': power, 'systemBattery': system_battery(power), 'agents': agent_status(),
+    return {'timerMigrationWarning':migration_warning, 'metrics': metrics(), 'batteries': power, 'systemBattery': system_battery(power), 'agents': agent_status(),
             'clocks': world_clocks(), 'timer': state.get('timer', {}),
             'shelf': [file_row(p) for p in state.get('shelf', [])[:40] if Path(p).is_absolute()],
             'settings': state.get('settings', {}),
@@ -339,8 +343,74 @@ def timer_start(minutes, label):
                 stop_timer(unit)
                 raise
         state['timer'] = {'unit':unit, 'label':label, 'end':time.time()+minutes*60,
-                          'duration': minutes*60}
+                          'duration': minutes*60, 'transport':2, 'scheduled':True}
     return {'message':'Temporizador iniciado'}
+
+
+def migrate_timer():
+    """Quiesce legacy execution first; durably retain a retryable private payload."""
+    observed=read_json(STATE/'state.json',{}) or {}
+    if not isinstance(observed,dict):return
+    candidate=observed.get('timer',{})
+    if not isinstance(candidate,dict):return
+    if not candidate or (candidate.get('transport')==2 and candidate.get('scheduled') is True):return
+    failure=None
+    with locked_state() as state:
+        timer=state.get('timer',{})
+        if not isinstance(timer,dict):return
+        unit=timer.get('unit','')
+        if not isinstance(unit,str):return
+        if not unit or (timer.get('transport')==2 and timer.get('scheduled') is True):
+            return
+        if not re.fullmatch(r'omarchy-notch-focus-\d+',unit):
+            return
+        # Stop BOTH timer and service before any dependency check or reschedule.
+        # If this fails, don't falsely mark migration complete.
+        legacy=timer.get('transport')!=2
+        if legacy:
+            states=run(['systemctl','--user','show',unit+'.timer',unit+'.service',
+                        '--property=LoadState','--value']).splitlines()
+            if [value for value in states if value]==['not-found','not-found']:
+                state['timer']={}
+                return
+        # Persist intent with the OLD identifier before stopping it. A crash
+        # after stop must retry, not mistake the unloaded unit for history.
+        if legacy:timer['legacyStopPending']=True
+        timer['transport']=2
+        timer['scheduled']=False
+        atomic_json(STATE/'state.json',state)
+        stop_timer(unit)
+        end=timer.get('end')
+        label=timer.get('label')
+        if not isinstance(label,str) or len(label)>180 or not isinstance(end,(int,float)) or not math.isfinite(end):
+            state['timer']={}
+            return
+        if timer.get('legacyStopPending') and end<=time.time():
+            state['timer']={}
+            return
+        timer.pop('legacyStopPending',None)
+        timer['unit']='omarchy-notch-focus-'+str(time.time_ns())
+        timer['transport']=2
+        timer['scheduled']=False
+        # Checkpoint after disabling old execution: schedule/dependency failures
+        # or a crash must not erase the reminder or re-enable the old command.
+        atomic_json(STATE/'state.json',state)
+        try:
+            label=timer.get('label')
+            end=timer.get('end')
+            if not isinstance(label,str) or len(label)>180 or not isinstance(end,(int,float)) or not math.isfinite(end):
+                raise ValueError('Invalid saved timer')
+            helper=str(Path(__file__).resolve().with_name('timer_notify.py'))
+            run(['/usr/bin/python3',helper,'--check'])
+            delay=max(0.1,end-time.time())
+            run(['systemd-run','--user','--quiet','--collect',f'--on-active={delay:.3f}s',
+                 f'--unit={timer["unit"]}',f'--setenv=XDG_STATE_HOME={STATE.parent}',
+                 '/usr/bin/python3',helper,timer['unit']])
+            timer['scheduled']=True
+        except (OSError,ValueError,subprocess.SubprocessError) as error:
+            failure=error
+    if failure is not None:
+        raise ValueError('Timer migration pending') from None
 
 
 def timer_cancel():

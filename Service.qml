@@ -165,7 +165,7 @@ Item {
     var revision=taskRevision
     job.createObject(root, {argv: ["python3", backendPath, "status"], callback: function(data) {
       refreshing = false
-      if (data.ok) applyStatus(data,revision)
+      if (data.ok) {applyStatus(data,revision);if(data.timerMigrationWarning)feedback=data.timerMigrationWarning}
       else feedback = String(data.error || "Não foi possível ler o sistema")
     }})
   }

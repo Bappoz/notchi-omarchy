@@ -205,7 +205,7 @@ Item {
     if (busy>=4) { lyricsState="error";lyricsError="Aguarde as operações em andamento";return }
     var request=++lyricsRequest
     loadedLyricsKey=key; lyrics=[]; lyricsState="loading"; lyricsError=""; busy++
-    job.createObject(root, {argv:["python3",backendPath,"lyrics-online",player.trackArtist,player.trackTitle,player.trackAlbum||"",String(player.length||0)],callback:function(data){
+    job.createObject(root, {argv:["python3",backendPath,"lyrics-online"],inputText:JSON.stringify({artist:player.trackArtist,title:player.trackTitle,album:player.trackAlbum||"",duration:String(player.length||0)}),callback:function(data){
       busy--
       // A response for the previous song must never replace the current lyrics.
       if(request!==lyricsRequest || key!==lyricsTrackKey)return

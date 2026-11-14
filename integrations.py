@@ -312,7 +312,15 @@ def dispatch(action,args):
     if action=='markets':return markets()
     if action=='home-states':return home_states()
     if action=='home-command':return home_command(*args)
-    if action=='lyrics-online':return lyrics(*args)
+    if action=='lyrics-online':
+        if args:raise ValueError('Lyrics metadata must be sent through stdin')
+        raw=__import__('sys').stdin.readline(8193)
+        if len(raw)>8192:raise ValueError('Lyrics request too large')
+        payload=json.loads(raw)
+        if not isinstance(payload,dict):raise ValueError('Invalid lyrics request')
+        values=[payload.get(key,default) for key,default in [('artist',''),('title',''),('album',''),('duration','0')]]
+        if not all(isinstance(value,str) for value in values):raise ValueError('Invalid lyrics metadata')
+        return lyrics(*values)
     if action=='spotify-devices':return spotify_devices()
     if action=='spotify-transfer':return spotify_transfer(*args)
     raise ValueError('Integração desconhecida')

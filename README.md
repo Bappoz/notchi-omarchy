@@ -134,3 +134,7 @@ Design suggestions, feature ideas, bug reports and pull requests are welcome! Op
 - [PrayTime](https://github.com/zarrabi/praytime), de Hamid Zarrabi-Zadeh — cálculo offline; código original e licença em `plugin/vendor/`.
 - [Hyprland: regras de janelas](https://wiki.hypr.land/configuring/core/rules/window-rules/) e [dispatchers](https://wiki.hypr.land/0.57.0/configuring/core/dispatchers/) — APIs de foco/regras verificadas também na instalação local 0.56.2.
 - [Home Assistant REST API](https://contributors.home-assistant.io/core/internals/rest-api/), [Spotify Web API](https://developer.spotify.com/documentation/web-api/reference/get-a-users-available-devices), [Open-Meteo](https://open-meteo.com/en/docs), [Frankfurter](https://frankfurter.dev/), [CoinGecko](https://docs.coingecko.com/reference/coins-markets), [Alpha Vantage](https://www.alphavantage.co/documentation/) e [LRCLIB](https://lrclib.net/docs) — fontes dos conectores opcionais.
+
+## Privacy fix — 0.6.1
+
+Lyrics metadata is passed to the Python worker through a private stdin pipe, never in its command-line arguments. This prevents disclosure through concurrent process-command-line inspection by another local account. The documented LRCLIB network lookup still receives artist/title/album/duration when the Lyrics view requests a lookup; stdin transport does not make that external lookup private. No temporary metadata file or metadata environment variable is created.

@@ -304,23 +304,39 @@ def status():
                       ['tesseract','magick','hyprpicker','ffmpeg','ffplay','wl-copy','wpctl','brightnessctl']}}
 
 
+def stop_timer(unit):
+    """Missing collected units are already stopped; other failures stay fatal."""
+    try:
+        run(['systemctl','--user','stop',unit+'.timer',unit+'.service'])
+    except ValueError:
+        states=run(['systemctl','--user','show',unit+'.timer',unit+'.service',
+                    '--property=LoadState','--value']).splitlines()
+        if [value for value in states if value] != ['not-found','not-found']:
+            raise
+
+
 def timer_start(minutes, label):
     minutes = int(minutes)
     if not 1 <= minutes <= 240:
         raise ValueError('Escolha entre 1 e 240 minutos')
+    if not isinstance(label,str) or len(label)>180:raise ValueError('Invalid timer message')
     label = clean(label or 'Hora de fazer uma pausa', 180)
+    helper = str(Path(__file__).resolve().with_name('timer_notify.py'))
+    # Check the distro Python/Gio dependency before changing an existing timer.
+    run(['/usr/bin/python3',helper,'--check'])
     unit = 'omarchy-notch-focus-' + str(time.time_ns())
     # systemd owns delivery, so closing/reloading the shell cannot lose the alert.
     with locked_state() as state:
         previous = state.get('timer', {}).get('unit', '')
         run(['systemd-run','--user','--quiet','--collect',f'--on-active={minutes}m',
-             f'--unit={unit}','omarchy-notification-send','Notchi',label])
+             f'--unit={unit}',f'--setenv=XDG_STATE_HOME={STATE.parent}',
+             '/usr/bin/python3',helper,unit])
         if re.fullmatch(r'omarchy-notch-focus-\d+', previous):
             try:
-                run(['systemctl','--user','stop',previous+'.timer',previous+'.service'])
+                stop_timer(previous)
             except (OSError, ValueError, subprocess.SubprocessError):
                 # Roll back the replacement rather than orphaning two alerts.
-                run(['systemctl','--user','stop',unit+'.timer',unit+'.service'])
+                stop_timer(unit)
                 raise
         state['timer'] = {'unit':unit, 'label':label, 'end':time.time()+minutes*60,
                           'duration': minutes*60}
@@ -331,7 +347,7 @@ def timer_cancel():
     with locked_state() as state:
         unit = state.get('timer',{}).get('unit','')
         if re.fullmatch(r'omarchy-notch-focus-\d+', unit):
-            run(['systemctl','--user','stop',unit+'.timer',unit+'.service'])
+            stop_timer(unit)
         state['timer'] = {}
     return {'message':'Temporizador cancelado'}
 
@@ -478,7 +494,14 @@ def main():
             import telemetry
             result=telemetry.snapshot()
         elif action=='status': result=status()
-        elif action=='timer-start': result=timer_start(*args)
+        elif action=='timer-start':
+            if args:raise ValueError('Timer requests must use stdin')
+            raw=sys.stdin.readline(4097)
+            if len(raw)>4096:raise ValueError('Timer request too large')
+            payload=json.loads(raw)
+            if not isinstance(payload,dict) or set(payload)!={'minutes','label'}:raise ValueError('Invalid timer request')
+            if type(payload['minutes']) is not int:raise ValueError('Invalid timer duration')
+            result=timer_start(payload['minutes'],payload['label'])
         elif action=='timer-cancel': result=timer_cancel()
         elif action=='shelf-add': result=shelf_add(args)
         elif action=='shelf-pick': result=pick_files()

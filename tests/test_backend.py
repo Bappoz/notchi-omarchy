@@ -279,7 +279,7 @@ class TimerTests(StateCase):
     def test_failed_scheduling_preserves_previous_timer(self):
         timer = {"unit": "omarchy-notch-focus-123", "end": 9999999999}
         backend.atomic_json(backend.STATE / "state.json", {"timer": timer})
-        with mock.patch.object(backend, "run", side_effect=ValueError("Scheduling failed")):
+        with mock.patch.object(backend, "run", side_effect=lambda argv, **kw: (_ for _ in ()).throw(ValueError("Scheduling failed")) if argv[0]=="systemd-run" else ""):
             with self.assertRaises(ValueError):
                 backend.timer_start(5, "Replacement")
         self.assertEqual(backend.read_json(backend.STATE / "state.json")["timer"], timer)

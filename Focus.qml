@@ -147,7 +147,7 @@ Item {
                 selected: true
                 accent: "#ff9f0a"
                 Layout.fillWidth: true
-                onClicked: root.model.action("timer-start", [String(root.minutes), message.text || root.t("pauseLabel")])
+                onClicked: root.model.action("timer-start", [], null, JSON.stringify({minutes:root.minutes,label:message.text || root.t("pauseLabel")}))
             }
 
             NotchButton {

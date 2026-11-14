@@ -138,3 +138,15 @@ Design suggestions, feature ideas, bug reports and pull requests are welcome! Op
 ## Privacy fix — 0.6.1
 
 Lyrics metadata is passed to the Python worker through a private stdin pipe, never in its command-line arguments. This prevents disclosure through concurrent process-command-line inspection by another local account. The documented LRCLIB network lookup still receives artist/title/album/duration when the Lyrics view requests a lookup; stdin transport does not make that external lookup private. No temporary metadata file or metadata environment variable is created.
+
+## Timer privacy fix — 0.6.2
+
+Custom timer messages travel as bounded JSON through stdin, never QML/Python command arguments. The transient user-systemd service receives only a timer identifier and the state location. `timer_notify.py` reads the existing owner-only state file under its lock and calls the session notification service directly through Gio D-Bus, without a notification CLI subprocess or message environment variable. Delivery clears the completed timer payload; cancellation/replacement invalidates older identifiers. This protects against other local accounts inspecting process command lines, not against the account owner, root, the notification service or someone viewing the screen.
+
+Timers require the distribution Python at `/usr/bin/python3` and PyGObject/Gio (`python-gobject` on Arch). Availability is checked before scheduling so an existing timer remains unchanged if the dependency is missing. Restarting the shell does not affect delivery. **A reminder scheduled before this update still has its original systemd command: cancel/recreate it after updating.** No software can retract command-line data that has already been observed. The separate “Reminders” shortcut delegates to Omarchy's own reminder application and is outside Notchi's timer implementation.
+
+Regression verification: `python -m unittest discover -s tests`; private notification-bus delivery test: `dbus-run-session -- /usr/bin/python3 tests/timer_dbus_probe.py`. The probe uses synthetic text and never sends a notification to the normal desktop bus.
+
+Delivery is one-shot: success or failure clears the stored message. Failures log a generic error, and later cancellation/replacement recovers even when systemd has already collected the previous units.
+
+0.6.2 verification: all 94 tests passed with native Qt tests enabled; isolated real D-Bus delivery passed while checking the helper's argv/environment; real user-systemd scheduling, ExecStart inspection, cancellation and stale-unit recovery passed. An independent read-only Claude review approved the corrected implementation. This is targeted verification, not a guarantee that the entire plugin has no vulnerabilities.

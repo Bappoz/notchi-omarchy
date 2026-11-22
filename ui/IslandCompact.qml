@@ -33,7 +33,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: 28
         height: 26
-        visible: agents.width < 2 && host.alertProgress < .01
+        visible: agents.width < 2 && host.alertProgress < .01 && host.hudProgress < .01
         enabled: visible && !host.opened
         iconName: "emblem-calendar"
         iconSize: 15

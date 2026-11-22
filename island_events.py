@@ -3,7 +3,7 @@
 import hashlib
 import json
 import os
-from pathlib import PurePath
+from pathlib import Path, PurePath
 import re
 import shutil
 import subprocess
@@ -68,6 +68,7 @@ def classify(app_name, desktop_entry, category, summary, action=""):
 
 # A2DP sink, HSP headset, HFP hands-free and LE Audio unicast capability.
 AUDIO_UUIDS = {"110b", "1108", "111e", "184e"}
+EARBUD_NAME = re.compile(r"\b(?:airpods|earbuds?|\w*buds|tws|wave beam|tune beam|live beam|wf[- ]\w+)\b", re.I)
 
 
 def opaque_connection(kind, identifier):
@@ -83,14 +84,84 @@ def wifi_profiles(output):
     return sorted(set(connected))
 
 
-def bluetooth_headsets(objects):
-    connected = []
+def bluetooth_devices(objects):
+    connected = {}
     for path, interfaces in objects.items():
         device = interfaces.get("org.bluez.Device1", {})
+        if not device.get("Connected"):
+            continue
         profiles = {uuid[4:8].lower() for uuid in device.get("UUIDs", [])}
-        if device.get("Connected") and profiles & AUDIO_UUIDS:
-            connected.append(opaque_connection("headphones", path))
-    return sorted(set(connected))
+        icon = device.get("Icon", "")
+        audio = bool(profiles & AUDIO_UUIDS) or icon in ("audio-headset", "audio-headphones")
+        identifier = opaque_connection("bluetooth", path)
+        percentage = interfaces.get("org.bluez.Battery1", {}).get("Percentage")
+        batteries = [{"label": "device", "level": percentage}] if (
+            type(percentage) is int and 0 <= percentage <= 100
+        ) else []
+        name = str(device.get("Alias") or device.get("Name") or "")[:100]
+        model = str(device.get("Name") or name)
+        connected[identifier] = {
+            "name": name, "audio": audio, "batteries": batteries,
+            "inEar": audio and bool(EARBUD_NAME.search(model)),
+        }
+    return connected
+
+
+def bluetooth_headsets(objects):
+    return sorted(device_id for device_id, device in bluetooth_devices(objects).items() if device["audio"])
+
+
+def pipewire_camera(objects):
+    for node in objects:
+        info = node.get("info") or {}
+        props = info.get("props") or {}
+        if (node.get("type") == "PipeWire:Interface:Node" and info.get("state") == "running"
+                and props.get("media.class") == "Video/Source"
+                and props.get("device.api") in ("v4l2", "libcamera")):
+            return True
+    return False
+
+
+def camera_in_use():
+    """Read graph and descriptor metadata without opening the camera."""
+    try:
+        result = subprocess.run(["pw-dump"], capture_output=True, timeout=1.2, check=True)
+        if pipewire_camera(json.loads(result.stdout)):
+            return True
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+
+    # V4L2 applications such as browsers can bypass PipeWire. Ignore the
+    # descriptor held by the graph manager and devices used only for metadata.
+    cameras = set()
+    for device in Path("/sys/class/video4linux").glob("video*"):
+        try:
+            is_capture = (device / "index").read_text().strip() == "0"
+            if is_capture and device.resolve().is_relative_to("/sys/devices/virtual"):
+                continue
+            if is_capture:
+                cameras.add("/dev/" + device.name)
+        except OSError:
+            continue
+    if not cameras:
+        return False
+    for process in Path("/proc").iterdir():
+        if not process.name.isdecimal():
+            continue
+        try:
+            if process.stat().st_uid != os.getuid():
+                continue
+            if (process / "comm").read_text().strip().startswith(("pipewire", "wireplumber")):
+                continue
+            for descriptor in (process / "fd").iterdir():
+                try:
+                    if os.readlink(descriptor) in cameras:
+                        return True
+                except OSError:
+                    continue
+        except OSError:
+            continue
+    return False
 
 
 def connections():
@@ -104,21 +175,21 @@ def connections():
     except (OSError, subprocess.SubprocessError):
         pass
 
-    headphones = None
+    devices = None
     try:
         from gi.repository import Gio, GLib
     except ImportError:
-        return {"wifi": wifi, "headphones": headphones}
+        return {"wifi": wifi, "devices": devices}
     try:
         bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
         reply = bus.call_sync(
             "org.bluez", "/", "org.freedesktop.DBus.ObjectManager", "GetManagedObjects",
             None, None, Gio.DBusCallFlags.NO_AUTO_START, 1200, None,
         )
-        headphones = bluetooth_headsets(reply.unpack()[0])
+        devices = bluetooth_devices(reply.unpack()[0])
     except GLib.Error:
         pass
-    return {"wifi": wifi, "headphones": headphones}
+    return {"wifi": wifi, "devices": devices}
 
 
 def session_available():
@@ -185,6 +256,9 @@ def monitor(Gio, GLib):
 if __name__ == "__main__":
     if sys.argv[1:] == ["connections"]:
         print(json.dumps(connections()))
+        sys.exit(0)
+    if sys.argv[1:] == ["camera"]:
+        print(json.dumps(camera_in_use()))
         sys.exit(0)
     if sys.argv[1:] == ["session"]:
         sys.exit(0 if session_available() else 1)

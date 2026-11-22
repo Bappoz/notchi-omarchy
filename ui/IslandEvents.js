@@ -2,7 +2,8 @@
 
 var priority = {
     call: 4, attention: 3, timer: 3, transfer: 2, done: 2,
-    report: 2, wifi: 2, headphones: 2, agent: 1, chat: 1, notification: 1, weather: 0
+    report: 2, wifi: 2, headphones: 2, bluetooth: 2,
+    charging: 2, lowBattery: 3, chargeFull: 2, agent: 1, chat: 1, notification: 1, weather: 0
 };
 
 function queue(pending, event) {
@@ -33,8 +34,29 @@ function agentStates(sessions) {
 
 
 function newConnections(previous, sample) {
-    return ["wifi", "headphones"].filter(function(kind) {
-        return Array.isArray(previous[kind]) && Array.isArray(sample[kind])
-            && sample[kind].some(function(id) { return !previous[kind].includes(id); });
-    });
+    var events = [];
+    for (var kind of ["wifi", "headphones"]) {
+        if (Array.isArray(previous[kind]) && Array.isArray(sample[kind])
+                && sample[kind].some(function(id) { return !previous[kind].includes(id); }))
+            events.push({kind: kind});
+    }
+    if (previous.devices && sample.devices) {
+        for (var id of Object.keys(sample.devices)) {
+            if (Object.prototype.hasOwnProperty.call(previous.devices, id)) continue;
+            var device = sample.devices[id];
+            events.push({kind: device.audio ? "headphones" : "bluetooth", deviceId: id, device: device});
+        }
+    }
+    return events;
+}
+
+function powerEvent(previous, sample) {
+    if (!previous || !sample) return "";
+    if (!sample.plugged && sample.level <= 20
+            && (previous.level > 20 || previous.plugged)) return "lowBattery";
+    if (sample.plugged && !previous.plugged) return "charging";
+    if (sample.plugged && (sample.full || sample.level === 100)
+            && previous.charging && !previous.full && previous.level < 100) return "chargeFull";
+    if (sample.plugged && sample.charging && !previous.charging && !previous.full) return "charging";
+    return "";
 }

@@ -22,11 +22,37 @@ Item {
   property int noticeEpoch: 0
   property var previousConnections: ({})
   property bool connectionProbeBusy: false
+  property bool volumeHudActive: false
+  property int volumeHudLevel: 0
+  property bool volumeHudMuted: false
+  property double lastOsdVolumeAt: 0
+  property bool cameraInUse: false
+  property var previousPower: null
+
+  function showVolume(level, muted, allowEarlySession) {
+    if (!sessionAvailable && !allowEarlySession) return
+    volumeHudLevel = Math.max(0, Math.min(100, level))
+    volumeHudMuted = muted
+    volumeHudActive = true
+    volumeHudTimer.restart()
+  }
+
+  function observePower(sample) {
+    var previous = previousPower
+    previousPower = sample
+    var event = Events.powerEvent(previous, sample)
+    if (event) enqueueNotice({kind: event, level: sample.level, tab: "system"})
+  }
+
+  Timer { id: volumeHudTimer; interval: 1450; onTriggered: root.volumeHudActive = false }
+
+  Local.Hardware { service: root }
+
 
   function observeConnections(sample) {
     var previous = previousConnections
     previousConnections = sample
-    for (var kind of Events.newConnections(previous, sample)) enqueueNotice({kind: kind})
+    for (var event of Events.newConnections(previous, sample)) enqueueNotice(event)
   }
 
   function pollConnections() {
@@ -138,6 +164,8 @@ Item {
   function clearNotices() {
     noticeEpoch++
     lastAgentStates = null
+    previousPower = null
+    volumeHudActive = false
     previousConnections = ({})
     noticeQueue = []
     noticeSeen = []
@@ -166,7 +194,7 @@ Item {
   function enqueueNotice(value) {
     var now = noticeClock()
     if (!now || !sessionAvailable || Events.priority[value.kind] === undefined) return false
-    var group = [value.kind, value.provider || value.source || ""].join(":")
+    var group = [value.kind, value.provider || value.source || value.deviceId || ""].join(":")
     var id = value.kind === "weather" ? value.event.id : group
     if (noticeSeen.some(function(seen) { return seen.id === id && now - seen.at < 6000 })) return false
     noticeSeen = noticeSeen.filter(function(seen) { return now - seen.at < 6000 })

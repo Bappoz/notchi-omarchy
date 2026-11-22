@@ -30,6 +30,7 @@ Item {
             font.weight: Font.DemiBold
         }
 
+        CameraLight { visible: !!root.model && root.model.cameraInUse }
 
         App.PlainLabel {
             text: root.host.compactTime

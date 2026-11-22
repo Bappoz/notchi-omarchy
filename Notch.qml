@@ -31,7 +31,7 @@ BarWidget {
     }
 
     function toggleCalendarPeek() {
-        if (opened || activityPeek) return;
+        if (opened || fullscreen || hudKind || activityPeek) return;
         hoverTimer.stop();
         calendarPeek = !calendarPeek;
         if (calendarPeek) card.forceActiveFocus();
@@ -49,7 +49,7 @@ BarWidget {
             "attention": "bell", "weather": "cloud-sun", "timer": "timer",
             "call": "headphones", "transfer": "arrow-down-to-line",
             "chat": "bell", "report": "file-text", "notification": "bell",
-            "wifi": "wifi", "headphones": "headphones"
+            "wifi": "wifi", "headphones": "headphones", "bluetooth": "bluetooth"
         };
         return icons[signalKind] || "";
     }
@@ -75,7 +75,30 @@ BarWidget {
             return (notice.provider === "claude" ? "Claude" : "Codex") + " · " + t("island." + notice.kind);
         return (notice.source ? notice.source + " · " : "") + t("island." + notice.kind);
     }
-    readonly property string islandState: opened ? "expanded" : activityPeek ? "alert"
+    readonly property string hudKind: {
+        if (!model || opened) return "";
+        if (!focusedScreen) return model.cameraInUse ? "camera" : "";
+        if (model.volumeHudActive) return "volume";
+        if (fullscreen) return model.cameraInUse ? "camera" : "";
+        if (activityPeek && ["charging", "lowBattery", "chargeFull"].includes(peekNotice.kind)) return peekNotice.kind;
+        if (activityPeek && peekNotice.device) return peekNotice.kind;
+        if (model.cameraInUse && !activityPeek) return "camera";
+        return "";
+    }
+    property string displayedHud: ""
+    property real hudProgress: 0
+    onHudKindChanged: {
+        if (hudKind) {
+            calendarPeek = false;
+            displayedHud = hudKind;
+        }
+        hudProgress = hudKind ? 1 : 0;
+    }
+    Behavior on hudProgress {
+        NumberAnimation { duration: root.motion ? Style.duration(190) : 0; easing.type: Easing.OutCubic }
+    }
+    readonly property bool deviceHud: ["headphones", "bluetooth"].includes(displayedHud)
+    readonly property string islandState: opened ? "expanded" : activityPeek ? "alert" : hudKind ? "compact"
         : signalKind || (model && model.islandClock) ? "compact" : "idle"
     onActivityPeekChanged: if (activityPeek) calendarPeek = false
     property real alertProgress: activityPeek ? 1 : 0
@@ -100,6 +123,36 @@ BarWidget {
     readonly property bool hoverEnabled: !model || model.preferences.hover !== "false"
     readonly property var islandScreen: root.QsWindow.window ? root.QsWindow.window.screen : null
     readonly property string screenName: islandScreen ? islandScreen.name : ""
+    property int fullscreenRevision: 0
+    readonly property bool fullscreen: {
+        var revision = fullscreenRevision;
+        var monitor = islandScreen ? Hyprland.monitorFor(islandScreen) : null;
+        var workspace = monitor ? monitor.activeWorkspace : null;
+        if (!workspace) return false;
+        var windows = Hyprland.toplevels.values;
+        for (var i = 0; i < windows.length; i++) {
+            var window = windows[i];
+            if (window.workspace && window.workspace.id === workspace.id
+                    && window.lastIpcObject && (Number(window.lastIpcObject.fullscreen) & 2))
+                return true;
+        }
+        return false;
+    }
+    onFullscreenChanged: if (fullscreen) close()
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            if (event && ["fullscreen", "openwindow", "closewindow", "movewindowv2",
+                          "workspacev2", "focusedmonv2"].includes(String(event.name)))
+                fullscreenRefresh.restart();
+        }
+    }
+    Timer {
+        id: fullscreenRefresh
+        interval: 80
+        onTriggered: { Hyprland.refreshToplevels(); fullscreenSettle.restart(); }
+    }
+    Timer { id: fullscreenSettle; interval: 250; onTriggered: root.fullscreenRevision++ }
     readonly property bool focusedScreen: !Hyprland.focusedMonitor || Hyprland.focusedMonitor.name === screenName
     readonly property string compactTime: clock.date.toLocaleTimeString(Qt.locale(I18n.formatLocale), "HH:mm")
     readonly property string compactDate: clock.date.toLocaleDateString(Qt.locale(I18n.formatLocale), "ddd d")
@@ -149,7 +202,7 @@ BarWidget {
     }
 
     function open() {
-        if (opened)
+        if (opened || fullscreen)
             return ;
 
         if (bar && bar.requestPopout)
@@ -198,6 +251,7 @@ BarWidget {
     }
 
     function openTab(tab) {
+        if (fullscreen) { held = false; return; }
         var parts = String(tab).split("/");
         if (parts[0] === "tools" && parts[1] === "camera")
             parts = ["camera"];
@@ -273,7 +327,7 @@ BarWidget {
                 ? root.bar.moduleWidgets(root.moduleName) : [root];
             return JSON.stringify({
                 opened: root.opened, tab: root.currentTab, screen: root.screenName,
-                state: root.islandState, activityPeek: root.activityPeek, service: !!root.model, pageReady: root.pageReady, pageError: root.pageError,
+                state: root.islandState, fullscreen: root.fullscreen, activityPeek: root.activityPeek, service: !!root.model, pageReady: root.pageReady, pageError: root.pageError,
                 pageMode: page.item && "mode" in page.item ? page.item.mode : "",
                 pageHasModel: !!page.item && !!page.item.model,
                 animation: root.animationStyle, y: card.y, width: card.width, height: card.height,
@@ -346,7 +400,7 @@ BarWidget {
 
         interval: Math.max(100, Math.min(1000, Number(root.setting("hoverDelay", 220))))
         onTriggered: {
-            if (root.hoverEnabled && !root.opened && !root.activityPeek && !root.calendarPeek
+            if (root.hoverEnabled && !root.opened && !root.activityPeek && !root.hudKind && !root.calendarPeek
                     && !compactView.calendarHovered && pillInput.containsMouse)
                 root.openTab("quick");
         }
@@ -366,7 +420,7 @@ BarWidget {
         id: window
 
         screen: root.islandScreen
-        visible: !!root.islandScreen
+        visible: !!root.islandScreen && (!root.fullscreen || !!root.hudKind || root.hudProgress > 0)
         color: "transparent"
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.namespace: "bappoz-notch"
@@ -391,9 +445,17 @@ BarWidget {
 
             anchors.horizontalCenter: parent.horizontalCenter
             y: root.topInset - 3 * root.progress
-            readonly property real compactWidth: root.pillWidth + (282 - root.pillWidth) * root.alertProgress
+            readonly property real regularWidth: root.pillWidth + (282 - root.pillWidth) * root.alertProgress
+            readonly property real hudWidth: root.deviceHud ? 286 : root.displayedHud === "volume" ? 306 : 234
             readonly property real compactSize: compactWidth + Math.max(0, 246 - compactWidth) * root.calendarProgress
-            readonly property real compactHeight: 38 + 8 * root.alertProgress
+            property real compactWidth: regularWidth + (hudWidth - regularWidth) * (root.hudKind ? 1 : 0)
+            Behavior on compactWidth {
+                NumberAnimation { duration: root.motion ? Style.duration(200) : 0; easing.type: Easing.OutCubic }
+            }
+            property real compactHeight: 38 + 8 * root.alertProgress + (root.deviceHud ? 15 : 5) * (root.hudKind ? 1 : 0)
+            Behavior on compactHeight {
+                NumberAnimation { duration: root.motion ? Style.duration(190) : 0; easing.type: Easing.OutCubic }
+            }
             readonly property real targetWidth: Math.max(0, Math.min(root.expandedWidth, window.width - 24))
             property real expandedTargetWidth: targetWidth
             property real expandedTargetHeight: root.expandedHeight
@@ -427,7 +489,8 @@ BarWidget {
             Rectangle {
                 anchors.fill: parent
                 radius: (19 + 4 * root.alertProgress) + 9 * root.progress
-                color: root.theme === "midnight" ? "#09090c" : root.theme === "frosted" ? "#f52a2a32" : "#f518181f"
+                color: Qt.tint(root.theme === "midnight" ? "#09090c" : root.theme === "frosted" ? "#f52a2a32" : "#f518181f",
+                    Qt.alpha("#07090d", .96 * root.hudProgress))
                 border.width: 1
                 border.color: Qt.tint("#34343f", Qt.alpha(root.signalTint, .28 * root.alertProgress))
             }
@@ -437,7 +500,7 @@ BarWidget {
                 anchors.fill: parent
                 radius: 19 + 4 * root.alertProgress + 9 * root.progress
                 tint: root.signalTint
-                opacity: 1 - root.progress
+                opacity: (1 - root.progress) * (1 - root.hudProgress)
                 running: root.progress < .99 && ["media", "working"].includes(root.signalKind)
                 alertAt: root.activityPeek ? root.peekNotice.queuedAt : 0
                 motion: root.motion
@@ -459,7 +522,7 @@ BarWidget {
                     enabled: !root.opened
                     hoverEnabled: enabled
                     cursorShape: Qt.PointingHandCursor
-                    onEntered: if (root.hoverEnabled && !root.activityPeek && !root.calendarPeek) hoverTimer.restart()
+                    onEntered: if (root.hoverEnabled && !root.activityPeek && !root.hudKind && !root.calendarPeek) hoverTimer.restart()
                     onExited: hoverTimer.stop()
                     onClicked: root.activateIsland()
                     onWheel: function(event) {
@@ -474,7 +537,17 @@ BarWidget {
                     id: compactView
                     anchors.fill: parent
                     host: root
+                    opacity: 1 - root.hudProgress
+                    visible: opacity > 0
                 }
+
+                UI.HardwareHud {
+                    anchors.fill: parent
+                    host: root
+                    opacity: root.hudProgress
+                    visible: opacity > 0
+                }
+
 
             }
 
@@ -653,6 +726,27 @@ BarWidget {
         }
 
         Rectangle {
+            readonly property bool showing: root.opened && root.focusedScreen && !!root.model && root.model.volumeHudActive
+            visible: opacity > 0
+            opacity: showing ? 1 : 0
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: card.y + card.height + 6 - 4 * (1 - opacity)
+            width: 264
+            height: 38
+            radius: 17
+            color: "#080a10"
+            border.color: "#363941"
+
+            Behavior on opacity { NumberAnimation { duration: root.motion ? Style.duration(150) : 0 } }
+
+            UI.HardwareHud {
+                anchors.fill: parent
+                host: root
+                kind: "volume"
+            }
+        }
+
+        Rectangle {
             visible: root.opened && !!root.model && root.model.feedback !== ""
             anchors.horizontalCenter: parent.horizontalCenter
             y: card.y + card.height + 8
@@ -675,7 +769,7 @@ BarWidget {
 
         }
 
-        mask: Region { item: card }
+        mask: Region { item: root.fullscreen ? null : card }
 
     }
 

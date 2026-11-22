@@ -6,6 +6,7 @@ import "Plugin" as Plugin
 ShellRoot {
     id:root
     Plugin.Service{id:backend;pollingEnabled:false}
+    Plugin.DesktopOsd{id:desktopOsd;service:backend}
     QtObject{id:fakeShell;function serviceFor(id){return backend}}
     QtObject {
         id:fakeBar
@@ -72,6 +73,31 @@ ShellRoot {
             var surface = root.findObject("notch-live-surface")
             return JSON.stringify({state:notch.islandState, width:pill.width, y:surface.parent.y, tab:notch.currentTab})
         }
+        function hardware(test: string): string {
+            notch.close()
+            backend.clearNotices()
+            backend.cameraInUse = test === "camera"
+            if (test === "volume") desktopOsd.open('{"icon":"volume-high","value":62}')
+            if (test === "brightness") desktopOsd.open('{"icon":"brightness","value":35}')
+            if (test === "charging" || test === "lowBattery" || test === "chargeFull") {
+                backend.observePower({level: test === "chargeFull" ? 99 : 21, plugged: test === "chargeFull", charging: test === "chargeFull", full:false})
+                backend.observePower({
+                    level: test === "chargeFull" ? 100 : test === "lowBattery" ? 20 : 21,
+                    plugged: test !== "lowBattery",
+                    charging: test === "charging",
+                    full: test === "chargeFull"
+                })
+            }
+            if (test === "bluetooth") {
+                backend.observeConnections({devices:{}})
+                backend.observeConnections({devices:{fixture:{audio:true,inEar:true,name:"JBL Wave Beam 2",batteries:[{label:"device",level:82}]}}})
+            }
+            var result = JSON.stringify({hud:notch.hudKind, level:backend.volumeHudLevel, standalone:desktopOsd.opened,
+                notice:backend.currentNotice.kind || ""})
+            if (test === "brightness") desktopOsd.close()
+            return result
+        }
+        function hudState():string { return notch.hudKind }
         function timerState():string {
             backend.updateClock()
             backend.snapshot = Object.assign({},backend.snapshot,{timer:{end:backend.now+65}})

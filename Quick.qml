@@ -129,6 +129,7 @@ Item {
             onClicked: root.model.stopwatchElapsed = 0
         }
 
+        UI.CameraLight { visible: !!root.model && root.model.cameraInUse }
         UI.SettingsButton { objectName: "quick-settings"; host: root.host; visible: !!root.host }
     }
 }

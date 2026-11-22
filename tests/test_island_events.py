@@ -1,6 +1,6 @@
 import unittest
 
-from island_events import bluetooth_headsets, classify, wifi_profiles
+from island_events import bluetooth_devices, bluetooth_headsets, classify, pipewire_camera, wifi_profiles
 
 
 class NotificationAdapterTests(unittest.TestCase):
@@ -51,3 +51,30 @@ class ConnectionAdapterTests(unittest.TestCase):
             "/Keyboard": device(True, "1124"),
             "/Disconnected": device(False, "111e"),
         })), 2)
+
+    def test_reports_only_known_bluetooth_battery(self):
+        device = {"org.bluez.Device1": {
+            "Connected": True, "Alias": "Studio", "Icon": "audio-headset",
+        }}
+        data = bluetooth_devices({"/dev_AB_CD": device})
+        self.assertEqual(list(data.values()), [{"name": "Studio", "audio": True, "batteries": [], "inEar": False}])
+        device["org.bluez.Battery1"] = {"Percentage": 0}
+        self.assertEqual(list(bluetooth_devices({"/dev_AB_CD": device}).values())[0]["batteries"],
+                         [{"label": "device", "level": 0}])
+
+    def test_earbuds_are_identified_from_the_reported_model(self):
+        options = {"org.bluez.Device1": {
+            "Connected": True, "Icon": "audio-headphones",
+            "Name": "JBL Wave Beam 2", "Alias": "Desk audio",
+        }}
+        self.assertTrue(next(iter(bluetooth_devices({"/Buds": options}).values()))["inEar"])
+
+    def test_camera_probe_distinguishes_webcam_from_screencast_and_idle(self):
+        node = {"type": "PipeWire:Interface:Node", "info": {
+            "state": "running", "props": {"media.class": "Video/Source"},
+        }}
+        self.assertFalse(pipewire_camera([node]))
+        node["info"]["props"]["device.api"] = "libcamera"
+        self.assertTrue(pipewire_camera([node]))
+        node["info"]["state"] = "suspended"
+        self.assertFalse(pipewire_camera([node]))

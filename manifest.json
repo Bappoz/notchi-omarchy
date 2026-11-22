@@ -8,11 +8,13 @@
   "description": "A native dynamic island for Omarchy with media, calendar, files, focus and agents.",
   "kinds": [
     "service",
-    "bar-widget"
+    "bar-widget",
+    "panel"
   ],
   "entryPoints": {
     "service": "Service.qml",
-    "barWidget": "Notch.qml"
+    "barWidget": "Notch.qml",
+    "panel": "DesktopOsd.qml"
   },
   "barWidget": {
     "displayName": "Notchi",
@@ -69,5 +71,9 @@
         "defaultValue": "fluid"
       }
     ]
+  },
+  "keepLoaded": true,
+  "omarchy": {
+    "clonedFrom": "omarchy.osd"
   }
 }

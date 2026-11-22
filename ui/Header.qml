@@ -1,213 +1,48 @@
 import QtQuick
 import QtQuick.Layouts
 import ".." as App
-import qs.Commons
+import "Navigation.js" as Nav
 
 Item {
     id: root
 
-    property var host: null
+    required property var host
     property var model: null
-    property int revision: 0
-    readonly property var tabs: [{
-        "id": "home",
-        "icon": "house"
-    }, {
-        "id": "files",
-        "icon": "inbox"
-    }, {
-        "id": "clipboard",
-        "icon": "clipboard-list"
-    }, {
-        "id": "focus",
-        "icon": "timer"
-    }, {
-        "id": "camera",
-        "icon": "camera"
-    }, {
-        "id": "agents",
-        "icon": "sparkles"
-    }, {
-        "id": "system",
-        "icon": "activity"
-    }, {
-        "id": "daily",
-        "icon": "list-todo"
-    }, {
-        "id": "weather",
-        "icon": "cloud-sun"
-    }]
-    readonly property int activeIndex: host ? tabs.map(function(x) {
-        return x.id;
-    }).indexOf(host.currentTab) : 0
-    readonly property var selectedItem: {
-        var rev = revision;
-        return tabItems.itemAt(activeIndex);
-    }
+    readonly property var section: Nav.page(host.currentTab)
 
-    signal moreRequested()
-
-    implicitHeight: 28
-
-    Rectangle {
-        x: root.selectedItem ? root.selectedItem.x : 0
-        y: 2
-        width: root.selectedItem ? root.selectedItem.width : 0
-        height: 23
-        radius: 6
-        color: "#2effffff"
-        visible: root.activeIndex >= 0
-
-        Behavior on x {
-            NumberAnimation {
-                duration: Style.duration(230)
-                easing.type: Easing.OutCubic
-            }
-
-        }
-
-        Behavior on width {
-            NumberAnimation {
-                duration: Style.duration(230)
-                easing.type: Easing.OutCubic
-            }
-
-        }
-
-    }
-
-    Row {
-        id: nav
-
-        spacing: 2
-        height: 28
-
-        Repeater {
-            id: tabItems
-
-            model: root.tabs
-            onItemAdded: root.revision++
-
-            Item {
-                id: tab
-
-                required property var modelData
-                readonly property bool selected: root.host && root.host.currentTab === modelData.id
-
-                objectName: "tab-" + modelData.id
-                width: selected ? content.implicitWidth + 14 : 27
-                height: 28
-                Accessible.role: Accessible.Button
-                Accessible.name: root.host ? root.host.t("nav." + modelData.id) : modelData.id
-                Accessible.onPressAction: {
-                    if (root.host)
-                        root.host.openTab(modelData.id);
-
-                }
-
-                Rectangle {
-                    anchors.fill: parent
-                    anchors.topMargin: 2
-                    anchors.bottomMargin: 3
-                    radius: 6
-                    color: "#14ffffff"
-                    visible: hover.hovered && !tab.selected
-                }
-
-                Row {
-                    id: content
-
-                    anchors.centerIn: parent
-                    spacing: 4
-
-                    Icon {
-                        name: tab.modelData.icon
-                        size: 13
-                        opacity: tab.selected || hover.hovered ? 1 : 0.5
-                    }
-
-                    App.PlainLabel {
-                        visible: tab.selected
-                        text: root.host ? root.host.t("nav." + tab.modelData.id) : ""
-                        font.pixelSize: 11
-                        font.weight: Font.DemiBold
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    App.PlainLabel {
-                        visible: tab.modelData.id === "files" && root.model && root.model.shelf.length > 0
-                        text: root.model ? root.model.shelf.length : ""
-                        font.pixelSize: 8
-                        color: "#bfbfc3"
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                }
-
-                HoverHandler {
-                    id: hover
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        if (root.host)
-                            root.host.openTab(tab.modelData.id);
-
-                    }
-                }
-
-                Behavior on width {
-                    NumberAnimation {
-                        duration: Style.duration(210)
-                        easing.type: Easing.OutCubic
-                    }
-
-                }
-
-            }
-
-        }
-
-    }
+    implicitHeight: 31
 
     RowLayout {
-        anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: 7
+        anchors.fill: parent
+        spacing: 8
+
+        Icon {
+            name: root.section.icon
+            color: name.startsWith("emblem-") ? "white" : root.section.color
+            size: 17
+        }
 
         App.PlainLabel {
-            text: root.host ? root.host.compactTime : ""
+            Layout.fillWidth: true
+            text: root.host.t(root.section.key)
+            color: "#eef0f6"
+            font.pixelSize: 13
+            font.weight: Font.DemiBold
+        }
+
+
+        App.PlainLabel {
+            text: root.host.compactTime
             font.pixelSize: 11
-            color: "#b3b3b7"
-
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    if (root.host)
-                        root.host.openTab("calendar");
-
-                }
-            }
-
+            color: "#b4b8c6"
         }
 
         Battery {
             visible: !!root.model && !!root.model.systemBattery
-            level: root.model && root.model.systemBattery ? root.model.systemBattery.percent : 0
-            charging: !!root.model && !!root.model.systemBattery && root.model.systemBattery.charging
+            level: visible ? root.model.systemBattery.percent : 0
+            charging: visible && root.model.systemBattery.charging
         }
 
-        IconButton {
-            iconName: "ellipsis"
-            hint: root.host ? root.host.t("more") : "More"
-            implicitWidth: 24
-            implicitHeight: 24
-            onClicked: root.moreRequested()
-        }
-
+        SettingsButton { host: root.host }
     }
-
 }

@@ -8,6 +8,7 @@ Item {
 
     property var host: null
     property var model: null
+    readonly property color tint: "#ffc17c"
     property int minutes: 25
     readonly property bool active: !!model && model.remaining > 0
     readonly property real fraction: active ? Math.max(0, Math.min(1, model.remaining / (model.timer.duration || 1))) : 1
@@ -17,15 +18,26 @@ Item {
     }
 
     onFractionChanged: ring.requestPaint()
+    onActiveChanged: ring.requestPaint()
+
+    Rectangle {
+        anchors.fill: parent
+        radius: 16
+        border.color: "#20ffffff"
+        gradient: Gradient {
+            GradientStop { position: 0; color: "#23242b" }
+            GradientStop { position: 1; color: "#1a1b20" }
+        }
+    }
 
     RowLayout {
         anchors.fill: parent
-        spacing: 18
+        anchors.margins: 12
+        spacing: 16
 
         ColumnLayout {
             Layout.preferredWidth: 124
-            Layout.minimumWidth: 124
-            Layout.maximumWidth: 124
+            Layout.maximumWidth: 160
             Layout.fillWidth: false
             spacing: 7
 
@@ -33,7 +45,7 @@ Item {
                 text: root.t("focus")
                 font.pixelSize: 11
                 font.weight: Font.DemiBold
-                color: "#b2b2b8"
+                color: root.tint
                 Layout.alignment: Qt.AlignHCenter
             }
 
@@ -53,7 +65,7 @@ Item {
                         compact: true
                         Layout.fillWidth: true
                         selected: root.minutes === modelData
-                        accent: "#ff9f0a"
+                        accent: "#42434b"
                         onClicked: root.minutes = modelData
                     }
 
@@ -108,7 +120,7 @@ Item {
                     c.stroke();
                     c.beginPath();
                     c.arc(center, center, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * root.fraction);
-                    c.strokeStyle = root.active ? "#ff9f0a" : "rgba(255,255,255,.32)";
+                    c.strokeStyle = root.active ? root.tint : "rgba(255,193,124,.35)";
                     c.stroke();
                 }
             }
@@ -116,8 +128,8 @@ Item {
             PlainLabel {
                 anchors.centerIn: parent
                 text: root.active ? root.model.countdown : root.minutes + ":00"
-                font.pixelSize: 29
-                font.weight: Font.Medium
+                font.pixelSize: 32
+                font.weight: Font.DemiBold
                 font.letterSpacing: -1
             }
 
@@ -125,8 +137,7 @@ Item {
 
         ColumnLayout {
             Layout.preferredWidth: 124
-            Layout.minimumWidth: 124
-            Layout.maximumWidth: 124
+            Layout.maximumWidth: 160
             Layout.fillWidth: false
             spacing: 7
 
@@ -144,8 +155,10 @@ Item {
             NotchButton {
                 text: root.t("start")
                 iconName: "play-fill"
+                iconTint: root.tint
                 selected: true
-                accent: "#ff9f0a"
+                enabled: !!root.model
+                accent: "#42434b"
                 Layout.fillWidth: true
                 onClicked: root.model.action("timer-start", [], null, JSON.stringify({minutes:root.minutes,label:message.text || root.t("pauseLabel")}))
             }
@@ -153,6 +166,7 @@ Item {
             NotchButton {
                 text: root.t("reset")
                 iconName: "refresh-cw"
+                iconTint: root.tint
                 Layout.fillWidth: true
                 enabled: root.active
                 onClicked: root.model.action("timer-cancel", [])

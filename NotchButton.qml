@@ -13,7 +13,9 @@ AbstractButton {
     property bool selected: false
     property bool destructive: false
     property bool compact: false
+    property bool motionEnabled: true
     property bool plain: false
+    property color iconTint: "#ffffff"
     property color accent: "#ffffff"
     readonly property bool darkContent: selected && accent.r > 0.9 && accent.g > 0.5
 
@@ -29,7 +31,7 @@ AbstractButton {
 
     Behavior on scale {
         NumberAnimation {
-            duration: Style.duration(130)
+            duration: root.motionEnabled ? Style.duration(130) : 0
             easing.type: Easing.OutCubic
         }
 
@@ -49,7 +51,7 @@ AbstractButton {
                 visible: root.iconName !== ""
                 name: root.iconName
                 size: root.compact ? 12 : 13
-                color: root.darkContent ? "#000000" : root.destructive ? "#ff6961" : "#ffffff"
+                color: root.darkContent ? "#000000" : root.destructive ? "#ff6961" : root.iconTint
                 opacity: root.enabled ? 1 : 0.3
                 anchors.verticalCenter: parent.verticalCenter
             }
@@ -75,7 +77,7 @@ AbstractButton {
 
         Behavior on color {
             ColorAnimation {
-                duration: Style.duration(100)
+                duration: root.motionEnabled ? Style.duration(100) : 0
             }
 
         }

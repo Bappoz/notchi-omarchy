@@ -10,6 +10,10 @@ AbstractButton {
     property bool selected: false
     property bool circular: false
     property bool filled: false
+    property bool flatSelection: false
+    property real idleOpacity: 0.58
+    property bool glyphMotion: true
+    property real glyphRotation: 0
     property color tint: "white"
     property string hint: ""
 
@@ -27,7 +31,7 @@ AbstractButton {
 
     Behavior on scale {
         NumberAnimation {
-            duration: Style.duration(150)
+            duration: root.glyphMotion ? Style.duration(150) : 0
             easing.type: Easing.OutCubic
         }
 
@@ -38,15 +42,19 @@ AbstractButton {
             anchors.centerIn: parent
             name: root.iconName
             size: root.iconSize
+            rotation: root.glyphRotation
+            Behavior on rotation {
+                NumberAnimation { duration: root.glyphMotion ? Style.duration(240) : 0; easing.type: Easing.OutCubic }
+            }
             color: root.filled ? "#000000" : root.tint
-            opacity: root.enabled ? (root.selected || root.hovered || root.filled ? 1 : 0.58) : 0.2
+            opacity: root.enabled ? (root.selected || root.hovered || root.filled ? 1 : root.idleOpacity) : 0.2
         }
 
     }
 
     background: Rectangle {
         radius: root.circular ? width / 2 : 6
-        color: root.filled ? "white" : root.selected ? "#2effffff" : root.hovered || root.activeFocus ? "#16ffffff" : "transparent"
+        color: root.filled ? "white" : root.selected && !root.flatSelection ? "#2effffff" : root.hovered || root.activeFocus ? "#16ffffff" : "transparent"
         border.color: root.activeFocus ? "#88ffffff" : "transparent"
     }
 

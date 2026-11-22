@@ -17,3 +17,6 @@ IslandSignal 1.0 IslandSignal.qml
 IslandCompact 1.0 IslandCompact.qml
 CompactAgent 1.0 CompactAgent.qml
 IslandOrbit 1.0 IslandOrbit.qml
+SettingsButton 1.0 SettingsButton.qml
+NavigationDock 1.0 NavigationDock.qml
+MiniCalendar 1.0 MiniCalendar.qml

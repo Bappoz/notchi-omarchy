@@ -73,7 +73,7 @@ Item {
                 spacing: 3
 
                 PlainLabel {
-                    text: "OpenNotchi"
+                    text: "Notchi"
                     font.pixelSize: 14
                     font.weight: Font.Bold
                     Layout.leftMargin: 8
@@ -91,6 +91,10 @@ Item {
                         "icon": "globe",
                         "key": "connect"
                     }, {
+                        "id": "shortcuts",
+                        "icon": "emblem-overview",
+                        "key": "settings.shortcuts"
+                    }, {
                         "id": "about",
                         "icon": "circle-help",
                         "key": "aboutLabel"
@@ -99,6 +103,7 @@ Item {
                     Rectangle {
                         required property var modelData
 
+                        objectName: "settings-section-" + modelData.id
                         Layout.fillWidth: true
                         Layout.preferredHeight: 29
                         radius: 7
@@ -391,6 +396,49 @@ Item {
         }
 
         ColumnLayout {
+            visible: root.section === "shortcuts"
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 9
+
+            PlainLabel {
+                text: root.t("settings.shortcuts")
+                font.pixelSize: 20
+                font.weight: Font.Bold
+                Layout.bottomMargin: 5
+            }
+
+            Repeater {
+                model: [
+                    { tab: "quick", icon: "emblem-overview", key: "island.open" },
+                    { tab: "home", icon: "emblem-music", key: "media" },
+                    { tab: "daily", icon: "emblem-tasks", key: "nav.daily" },
+                    { tab: "calendar", icon: "emblem-calendar", key: "calendar" },
+                    { tab: "tools", icon: "terminal", key: "tools" }
+                ]
+
+                NotchButton {
+                    required property var modelData
+                    objectName: "settings-link-" + modelData.tab
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 32
+                    iconName: modelData.icon
+                    text: root.t(modelData.key)
+                    onClicked: root.host.openTab(modelData.tab)
+                }
+            }
+
+            Item { Layout.fillHeight: true }
+
+            NotchButton {
+                iconName: "x"
+                text: root.t("close")
+                plain: true
+                onClicked: root.host.close()
+            }
+        }
+
+        ColumnLayout {
             visible: root.section === "about"
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -404,7 +452,7 @@ Item {
             }
 
             PlainLabel {
-                text: "OpenNotchi for Omarchy"
+                text: "Notchi for Omarchy"
                 font.pixelSize: 19
                 font.weight: Font.Bold
                 Layout.alignment: Qt.AlignHCenter

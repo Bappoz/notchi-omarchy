@@ -82,9 +82,22 @@ Item {
         }
     }
 
+    Rectangle {
+        anchors.fill: parent
+        radius: 17
+        border.color: "#36ff8ba6"
+        gradient: Gradient {
+            orientation: Gradient.Horizontal
+            GradientStop { position: 0; color: "#33212b" }
+            GradientStop { position: 1; color: "#1b1920" }
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
-        spacing: 18
+        anchors.leftMargin: 14
+        anchors.rightMargin: 14
+        spacing: 15
 
         Item {
             Layout.preferredWidth: root.videoMode ? 199 : 124

@@ -59,10 +59,13 @@ ShellRoot {
             return "ok"
         }
         function enterSurface():void{var item=root.findObject("notch-live-surface");events.mouseMove(item,item.width/2,14)}
-        function openMediaMenu():string {
-            clickObject("quick-menu")
-            var result = clickObject("menu-home")
-            return result === "ok" ? notch.currentTab : result
+        function calendarPeekState():string {
+            var clock = root.findObject("notch-clock")
+            var card = root.findObject("notch-live-surface")
+            var today = root.findObject("mini-calendar-today")
+            return JSON.stringify({visible:notch.calendarPeek,height:card.height,dot:!!today && today.visible,
+                centered:Math.abs(clock.x + clock.width / 2 - clock.parent.width / 2) < 1
+                    && Math.abs(clock.y + clock.height / 2 - clock.parent.height / 2) < 1})
         }
         function island():string {
             var pill = root.findObject("notch-pill")

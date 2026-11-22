@@ -24,26 +24,34 @@ Item {
         }
     }
 
-    Column {
+    readonly property alias calendarHovered: calendarButton.hovered
+
+    IconButton {
+        id: calendarButton
+        objectName: "notch-mini-calendar-toggle"
+        x: 9
+        anchors.verticalCenter: parent.verticalCenter
+        width: 28
+        height: 26
+        visible: agents.width < 2 && host.alertProgress < .01
+        enabled: visible && !host.opened
+        iconName: "emblem-calendar"
+        iconSize: 15
+        hint: host.t("calendar.peek")
+        idleOpacity: .63
+        glyphMotion: host.motion
+        selected: host.calendarPeek
+        flatSelection: true
+        onClicked: host.toggleCalendarPeek()
+    }
+
+    App.PlainLabel {
         objectName: "notch-clock"
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: (parent.height - height) / 2 - 5 * host.alertProgress
-        spacing: 0
+        anchors.centerIn: parent
+        text: host.compactTime
+        font.pixelSize: 16
+        font.weight: Font.DemiBold
         opacity: 1 - host.alertProgress
-
-        App.PlainLabel {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: host.compactTime
-            font.pixelSize: 14
-            font.weight: Font.DemiBold
-        }
-
-        App.PlainLabel {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: host.compactDate
-            font.pixelSize: 9
-            color: "#b5b5bf"
-        }
     }
 
     Icon {

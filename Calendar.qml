@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import "ui" as UI
+import "ui/Month.js" as Month
 
 Item {
     id: root
@@ -10,12 +11,9 @@ Item {
     property var model: null
     property date shown: new Date()
     property date today: new Date()
+    readonly property color tint: "#ff9b94"
     readonly property var locale: Qt.locale(I18n.formatLocale)
-    readonly property var days: {
-        var first = new Date(shown.getFullYear(), shown.getMonth(), 1, 12), start = (first.getDay() + 6) % 7, rows = [];
-        for (var i = 0; i < 42; i++) rows.push(new Date(shown.getFullYear(), shown.getMonth(), i - start + 1, 12))
-        return rows;
-    }
+    readonly property var days: Month.days(shown)
 
     function t(key) {
         return host ? host.t(key) : key;
@@ -25,15 +23,24 @@ Item {
         shown = new Date(shown.getFullYear(), shown.getMonth() + delta, 1, 12);
     }
 
+    Rectangle {
+        anchors.fill: parent
+        radius: 16
+        border.color: "#20ffffff"
+        gradient: Gradient {
+            GradientStop { position: 0; color: "#23242b" }
+            GradientStop { position: 1; color: "#1a1b20" }
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
-        spacing: 22
+        anchors.margins: 12
+        spacing: 16
 
         ColumnLayout {
-            Layout.preferredWidth: 370
-            Layout.minimumWidth: 370
-            Layout.maximumWidth: 370
-            Layout.fillWidth: false
+            Layout.preferredWidth: 360
+            Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: 8
 
@@ -43,6 +50,7 @@ Item {
                 PlainLabel {
                     text: root.shown.toLocaleDateString(root.locale, "MMMM yyyy")
                     font.pixelSize: 14
+                    color: root.tint
                     font.weight: Font.DemiBold
                     Layout.fillWidth: true
                 }
@@ -93,7 +101,7 @@ Item {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 22
                         radius: 11
-                        color: isToday ? "#ff9f0a" : "transparent"
+                        color: isToday ? root.tint : "transparent"
 
                         PlainLabel {
                             anchors.centerIn: parent
@@ -135,7 +143,7 @@ Item {
                 UI.Icon {
                     name: "globe"
                     size: 13
-                    opacity: 0.6
+                    color: root.tint
                 }
 
                 PlainLabel {

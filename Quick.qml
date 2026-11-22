@@ -8,113 +8,70 @@ Item {
     property var host: null
     property var model: null
     readonly property var player: model ? model.player : null
-    readonly property var activeAgent: model ? model.activeAgent : null
-    readonly property int pendingTasks: model ? model.tasks.filter(function(task) { return !task.done }).length : 0
-    readonly property string trackKey: model ? model.lyricsTrackKey : ""
+    readonly property var agent: model ? model.activeAgent : null
+    readonly property bool stopwatchVisible: !!model && !!(model.stopwatchStart || model.stopwatchElapsed)
 
     function t(key) { return host ? host.t(key) : key }
 
-    onTrackKeyChanged: {
-        if (!host || !host.motion || !visible) return
-        trackArrival.restart()
-    }
-
-    ColumnLayout {
+    RowLayout {
         anchors.fill: parent
-        spacing: 8
+        spacing: 9
 
-        RowLayout {
+        Rectangle {
+            Layout.preferredWidth: 40
+            Layout.preferredHeight: 40
+            radius: 12
+            color: "#1e1f25"
+            border.color: "#18ffffff"
+
+            UI.Icon {
+                anchors.centerIn: parent
+                name: root.player ? "emblem-music" : root.agent ? "emblem-agents" : "emblem-calendar"
+                size: 20
+            }
+
+            Image {
+                anchors.fill: parent
+                anchors.margins: 3
+                source: root.player ? root.player.trackArtUrl : ""
+                sourceSize: Qt.size(80, 80)
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                visible: status === Image.Ready
+            }
+
+            TapHandler {
+                cursorShape: Qt.PointingHandCursor
+                onTapped: if (root.host) root.host.openTab(root.player ? "home" : root.agent ? "agents/activity" : "calendar")
+            }
+        }
+
+        ColumnLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 46
-            spacing: 10
+            spacing: 3
 
-            Rectangle {
-                Layout.preferredWidth: 40
-                Layout.preferredHeight: 40
-                radius: 12
-                color: "#24242d"
-
-                UI.Icon {
-                    anchors.centerIn: parent
-                    name: root.player ? "music-2" : root.activeAgent ? "" : "calendar"
-                    color: root.player ? "#a9e8cf" : root.activeAgent ? "#cdbaff" : "#b4b8ca"
-                    size: 18
-                }
-
-                Row {
-                    anchors.centerIn: parent
-                    visible: !root.player && !!root.activeAgent
-                    Repeater {
-                        model: root.model ? root.model.activeProviders : []
-                        UI.CompactAgent {
-                            required property string modelData
-                            provider: modelData
-                            width: 19
-                            motion: !!root.host && root.host.motion
-                        }
-                    }
-                }
-
-                Image {
-                    anchors.fill: parent
-                    anchors.margins: 3
-                    source: root.player ? root.player.trackArtUrl : ""
-                    sourceSize: Qt.size(80, 80)
-                    fillMode: Image.PreserveAspectCrop
-                    asynchronous: true
-                    visible: status === Image.Ready
-                }
-            }
-
-            ColumnLayout {
-                id: track
+            PlainLabel {
                 Layout.fillWidth: true
-                spacing: 3
-
-                PlainLabel {
-                    Layout.fillWidth: true
-                    text: root.player ? (root.player.trackTitle || root.t("media"))
-                        : root.activeAgent ? root.t("agentsWorking") : (root.host ? root.host.compactTime : "")
-                    font.pixelSize: 14
-                    font.weight: Font.DemiBold
-                }
-
-                PlainLabel {
-                    Layout.fillWidth: true
-                    text: root.player ? (root.player.trackArtist || root.player.identity || "")
-                        : root.activeAgent ? (root.activeAgent.provider === "claude" ? "Claude" : "Codex")
-                        : (root.host ? root.host.compactDate : "")
-                    visible: text.length > 0
-                    font.pixelSize: 11
-                    color: "#b5b5bf"
-                }
-
-                SequentialAnimation {
-                    id: trackArrival
-                    NumberAnimation { target: track; property: "opacity"; to: .45; duration: 65 }
-                    NumberAnimation { target: track; property: "opacity"; to: 1; duration: 155; easing.type: Easing.OutCubic }
-                }
+                text: root.player ? (root.player.trackTitle || root.t("media"))
+                    : root.agent ? root.t("agentsWorking") : (root.host ? root.host.compactTime : "")
+                font.pixelSize: 15
+                font.weight: Font.DemiBold
             }
 
-            UI.IconButton {
-                iconName: root.host && root.host.held ? "pin-off" : "pin"
-                hint: root.t(root.host && root.host.held ? "unpin" : "pin")
-                selected: root.host ? root.host.held : false
-                onClicked: if (root.host) root.host.held = !root.host.held
-            }
-
-            UI.IconButton {
-                objectName: "quick-menu"
-                iconName: "ellipsis"
-                hint: root.t("more")
-                onClicked: if (root.host) root.host.showMenu()
+            PlainLabel {
+                Layout.fillWidth: true
+                text: root.player ? (root.player.trackArtist || root.player.identity || "")
+                    : root.agent ? (root.agent.provider === "claude" ? "Claude" : "Codex")
+                    : (root.host ? root.host.compactDate : "")
+                color: "#b4b7c3"
+                font.pixelSize: 11
+                visible: text.length > 0
             }
         }
 
         RowLayout {
             visible: !!root.player
-            Layout.alignment: Qt.AlignHCenter
-            spacing: 12
+            spacing: 0
 
             UI.IconButton {
                 iconName: "backward-fill"
@@ -122,17 +79,18 @@ Item {
                 enabled: !!root.player && root.player.canGoPrevious
                 onClicked: root.model.previous()
             }
+
             UI.IconButton {
                 objectName: "quick-play-pause"
                 iconName: root.player && root.player.isPlaying ? "pause-fill" : "play-fill"
                 hint: root.t("play")
-                filled: true
+                selected: true
                 circular: true
-                implicitWidth: 34
-                implicitHeight: 34
+                glyphMotion: !!root.host && root.host.motion
                 enabled: !!root.player && root.player.canTogglePlaying
                 onClicked: root.model.toggleMedia()
             }
+
             UI.IconButton {
                 iconName: "forward-fill"
                 hint: root.t("next")
@@ -141,52 +99,36 @@ Item {
             }
         }
 
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 6
-
-            Repeater {
-                model: [
-                    { tab: "focus", icon: "timer", label: root.model && root.model.remaining > 0 ? root.model.countdown : root.t("focus") },
-                    { tab: "daily", icon: "list-todo", label: root.t("nav.daily") + (root.pendingTasks ? " " + root.pendingTasks : "") },
-                    { tab: "agents/activity", icon: "sparkles", label: root.t("nav.agents") }
-                ]
-
-                NotchButton {
-                    required property var modelData
-
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 30
-                    iconName: modelData.icon
-                    text: modelData.label
-                    compact: true
-                    onClicked: root.host.openTab(modelData.tab)
-                }
-            }
+        NotchButton {
+            visible: !!root.model && root.model.remaining > 0
+            iconName: "emblem-focus"
+            text: visible ? root.model.countdown : ""
+            compact: true
+            plain: true
+            motionEnabled: !!root.host && root.host.motion
+            Accessible.name: root.t("focus") + " " + text
+            onClicked: root.host.openTab("focus")
         }
 
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 6
-
-            NotchButton {
-                Layout.fillWidth: true
-                iconName: "circle-dot"
-                compact: true
-                text: root.model && (root.model.stopwatchStart || root.model.stopwatchElapsed) ? root.model.stopwatchText : root.t("stopwatch")
-                Accessible.name: root.model && root.model.stopwatchStart ? root.t("stopwatchStop") : root.t("stopwatchStart")
-                enabled: !!root.model
-                onClicked: root.model.toggleStopwatch()
-            }
-
-            UI.IconButton {
-                visible: !!root.model && root.model.stopwatchElapsed > 0 && !root.model.stopwatchStart
-                iconName: "undo-2"
-                hint: root.t("reset")
-                onClicked: root.model.stopwatchElapsed = 0
-            }
+        NotchButton {
+            objectName: "quick-stopwatch"
+            iconName: "emblem-stopwatch"
+            text: root.stopwatchVisible ? root.model.stopwatchText : ""
+            compact: true
+            plain: true
+            motionEnabled: !!root.host && root.host.motion
+            Accessible.name: root.t(root.model && root.model.stopwatchStart ? "stopwatchStop" : "stopwatchStart")
+            enabled: !!root.model
+            onClicked: root.model.toggleStopwatch()
         }
 
-        Item { Layout.fillHeight: true }
+        UI.IconButton {
+            visible: root.stopwatchVisible && !root.model.stopwatchStart
+            iconName: "undo-2"
+            hint: root.t("reset")
+            onClicked: root.model.stopwatchElapsed = 0
+        }
+
+        UI.SettingsButton { objectName: "quick-settings"; host: root.host; visible: !!root.host }
     }
 }

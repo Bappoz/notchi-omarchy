@@ -19,6 +19,23 @@ BarWidget {
     readonly property var model: Local.Runtime.model
     readonly property var player: model ? model.player : null
     property bool opened: false
+    property bool calendarPeek: false
+    property real calendarReveal: calendarPeek ? 1 : 0
+    readonly property real calendarProgress: Math.max(0, Math.min(1, calendarReveal))
+    Behavior on calendarReveal {
+        NumberAnimation {
+            duration: root.motion ? Style.duration(root.calendarPeek ? 340 : 195) : 0
+            easing.type: Easing.Bezier
+            easing.bezierCurve: root.calendarPeek ? [0.24, 1.22, 0.36, 1, 1, 1] : Motion.closingCurve
+        }
+    }
+
+    function toggleCalendarPeek() {
+        if (opened || activityPeek) return;
+        hoverTimer.stop();
+        calendarPeek = !calendarPeek;
+        if (calendarPeek) card.forceActiveFocus();
+    }
     readonly property var peekNotice: model ? model.currentNotice : ({})
     readonly property bool activityPeek: !opened && focusedScreen && !!peekNotice.kind
     readonly property var recentNotice: model ? model.recentNotice : ({})
@@ -60,6 +77,7 @@ BarWidget {
     }
     readonly property string islandState: opened ? "expanded" : activityPeek ? "alert"
         : signalKind || (model && model.islandClock) ? "compact" : "idle"
+    onActivityPeekChanged: if (activityPeek) calendarPeek = false
     property real alertProgress: activityPeek ? 1 : 0
     Behavior on alertProgress {
         NumberAnimation { duration: root.motion ? Style.duration(300) : 0; easing.type: Easing.OutCubic }
@@ -70,6 +88,7 @@ BarWidget {
     property bool focusPrimed: false
     property string currentTab: "quick"
     property string subtab: ""
+    property string settingsReturnTab: "quick"
     property int direction: 1
     readonly property var tabs: ["home", "files", "clipboard", "focus", "camera", "agents", "calendar", "tools", "system", "daily", "weather", "quick"]
     readonly property bool motion: setting("animations", true) && (!model || model.preferences.animations !== "false") && Style.duration(100)>0
@@ -87,14 +106,14 @@ BarWidget {
     readonly property int topInset: 8
     readonly property bool topBar: bar && bar.position === "top"
     readonly property bool connectionAlert: activityPeek && ["wifi", "headphones"].includes(peekNotice.kind)
-    readonly property int expandedWidth: currentTab === "quick" ? 376 : currentTab === "agents" ? 748 : 708
+    readonly property int expandedWidth: currentTab === "quick" ? 452 : currentTab === "agents" ? 748 : 708
     readonly property int expandedHeight: Math.max(42, Math.min(
-        currentTab === "quick" ? (player ? 190 : 150) : Motion.height(currentTab, subtab),
+        currentTab === "quick" ? 116 : Motion.height(currentTab, subtab) + 56,
         window.height - topInset - 50))
     property real pillWidth: {
         var agents = model ? model.activeProviders.length : 0;
-        var statusWidth = model && model.islandClock ? 44 : 0;
-        if (signalIcon) statusWidth += 26;
+        var statusWidth = model && model.islandClock ? 52 : 0;
+        if (signalIcon || signalKind === "media") statusWidth += 26;
         return Math.max(166, 104 + 2 * Math.max(agents * 23, statusWidth));
     }
     Behavior on pillWidth {
@@ -136,6 +155,7 @@ BarWidget {
         if (bar && bar.requestPopout)
             bar.requestPopout(root);
 
+        calendarPeek = false;
         opened = true;
         if (model)
             model.expanded(true);
@@ -143,10 +163,10 @@ BarWidget {
     }
 
     function close() {
+        calendarPeek = false;
         if (!opened)
             return ;
 
-        moreMenu.close();
         opened = false;
         held = false;
         if (model)
@@ -166,8 +186,6 @@ BarWidget {
         }
     }
 
-    function showMenu() { moreMenu.open(); }
-
     function activateIsland() {
         if (activityPeek && model) {
             var tab = peekNotice.tab || "quick";
@@ -185,11 +203,11 @@ BarWidget {
             parts = ["camera"];
 
         var next = tabs.indexOf(parts[0]) >= 0 || parts[0] === "settings" ? parts[0] : "home";
+        if (next === "settings" && currentTab !== "settings")
+            settingsReturnTab = currentTab + (subtab ? "/" + subtab : "");
         direction = tabs.indexOf(next) >= tabs.indexOf(currentTab) ? 1 : -1;
         subtab = parts[1] || "";
         currentTab = next;
-        // Navigation preserves whether the panel was opened by hover or pinned.
-        moreMenu.close();
         open();
         Qt.callLater(page.inject);
         if (!held) leaveTimer.restart();
@@ -328,7 +346,8 @@ BarWidget {
 
         interval: Math.max(100, Math.min(1000, Number(root.setting("hoverDelay", 220))))
         onTriggered: {
-            if (root.hoverEnabled && !root.opened && !root.activityPeek && pillInput.containsMouse)
+            if (root.hoverEnabled && !root.opened && !root.activityPeek && !root.calendarPeek
+                    && !compactView.calendarHovered && pillInput.containsMouse)
                 root.openTab("quick");
         }
     }
@@ -338,9 +357,8 @@ BarWidget {
 
         interval: 330
         onTriggered: {
-            if (root.opened && !root.held && !surfaceHover.hovered && !moreMenu.visible) {
-                root.close();
-            }
+            if (surfaceHover.hovered) return;
+            if (root.calendarPeek || (root.opened && !root.held)) root.close();
         }
     }
 
@@ -353,7 +371,7 @@ BarWidget {
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.namespace: "bappoz-notch"
         WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.keyboardFocus: root.opened ? (root.held && !root.focusPrimed ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand) : WlrKeyboardFocus.None
+        WlrLayershell.keyboardFocus: root.opened ? (root.held && !root.focusPrimed ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand) : root.calendarPeek ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
         anchors {
             top: true
@@ -374,6 +392,7 @@ BarWidget {
             anchors.horizontalCenter: parent.horizontalCenter
             y: root.topInset - 3 * root.progress
             readonly property real compactWidth: root.pillWidth + (282 - root.pillWidth) * root.alertProgress
+            readonly property real compactSize: compactWidth + Math.max(0, 246 - compactWidth) * root.calendarProgress
             readonly property real compactHeight: 38 + 8 * root.alertProgress
             readonly property real targetWidth: Math.max(0, Math.min(root.expandedWidth, window.width - 24))
             property real expandedTargetWidth: targetWidth
@@ -386,8 +405,9 @@ BarWidget {
                 enabled: root.opened
                 NumberAnimation { duration: root.motion ? Style.duration(240) : 0; easing.type: Easing.OutCubic }
             }
-            width: Math.max(0, Math.min(window.width - 16, compactWidth + (expandedTargetWidth - compactWidth) * Math.max(0, root.reveal)))
-            height: Math.max(0, Math.min(window.height - y, compactHeight + (expandedTargetHeight - compactHeight) * Math.max(0, root.reveal)))
+            readonly property real closedHeight: compactHeight + 184 * Math.max(0, root.calendarReveal)
+            width: Math.max(0, Math.min(window.width - 16, compactSize + (expandedTargetWidth - compactSize) * Math.max(0, root.reveal)))
+            height: Math.max(0, Math.min(window.height - y, closedHeight + (expandedTargetHeight - closedHeight) * Math.max(0, root.reveal)))
             clip: true
             focus: root.opened
             Keys.onEscapePressed: root.close()
@@ -423,13 +443,12 @@ BarWidget {
                 motion: root.motion
             }
 
-            UI.IslandCompact {
+            Item {
                 id: pill
                 objectName: "notch-pill"
-                width: card.compactWidth
+                width: Math.min(card.width, card.compactSize)
                 height: card.compactHeight
                 anchors.horizontalCenter: parent.horizontalCenter
-                host: root
                 opacity: Math.max(0, 1 - root.progress * 3.5)
                 visible: opacity > 0
 
@@ -440,7 +459,7 @@ BarWidget {
                     enabled: !root.opened
                     hoverEnabled: enabled
                     cursorShape: Qt.PointingHandCursor
-                    onEntered: if (root.hoverEnabled && !root.activityPeek) hoverTimer.restart()
+                    onEntered: if (root.hoverEnabled && !root.activityPeek && !root.calendarPeek) hoverTimer.restart()
                     onExited: hoverTimer.stop()
                     onClicked: root.activateIsland()
                     onWheel: function(event) {
@@ -451,6 +470,23 @@ BarWidget {
                     Accessible.name: root.t("island.open")
                     Accessible.onPressAction: root.activateIsland()
                 }
+                UI.IslandCompact {
+                    id: compactView
+                    anchors.fill: parent
+                    host: root
+                }
+
+            }
+
+            Loader {
+                id: miniCalendar
+                objectName: "notch-mini-calendar"
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: 216
+                y: pill.height + 1 - 6 * (1 - root.calendarProgress)
+                active: root.calendarPeek || root.calendarProgress > .001
+                opacity: root.calendarProgress * (1 - root.progress)
+                sourceComponent: UI.MiniCalendar { today: clock.date }
             }
 
             HoverHandler {
@@ -484,7 +520,7 @@ BarWidget {
             Item {
                 id: content
 
-                width: Math.max(0, card.expandedTargetWidth - (root.currentTab === "quick" ? 32 : 56))
+                width: Math.max(0, card.expandedTargetWidth - 32)
                 height: Math.max(0, card.expandedTargetHeight - 22)
                 enabled: root.opened
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -504,9 +540,15 @@ BarWidget {
                     width: parent.width
                     host: root
                     model: root.model
-                    onMoreRequested: {
-                        moreMenu.open();
-                    }
+                }
+
+                UI.NavigationDock {
+                    id: dock
+                    host: root
+                    height: implicitHeight
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.bottom: parent.bottom
+                    enabled: !root.spatialTransition
                 }
 
                 Loader {
@@ -559,7 +601,8 @@ BarWidget {
                         right: parent.right
                         top: header.bottom
                         topMargin: 4
-                        bottom: parent.bottom
+                        bottom: dock.top
+                        bottomMargin: dock.visible ? 9 : 0
                     }
 
                     NumberAnimation {
@@ -609,116 +652,6 @@ BarWidget {
 
         }
 
-        Popup {
-            id: moreMenu
-            onClosed: if (root.opened && !root.held) leaveTimer.restart()
-
-            parent: window.contentItem
-            x: Math.max(8, card.x + card.width - width - 12)
-            y: card.y + 40
-            width: 204
-            padding: 6
-            closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-
-            background: Rectangle {
-                color: "#fa29292b"
-                radius: 12
-                border.color: "#35ffffff"
-                border.width: 1
-            }
-
-            contentItem: Column {
-                spacing: 2
-
-                Repeater {
-                    model: [{
-                        "id": "quick",
-                        "icon": "circle-dot",
-                        "key": "island.open"
-                    }, {
-                        "id": "home",
-                        "icon": "music-2",
-                        "key": "media"
-                    }, {
-                        "id": "daily",
-                        "icon": "list-todo",
-                        "key": "nav.daily"
-                    }, {
-                        "id": "calendar",
-                        "icon": "calendar",
-                        "key": "calendar"
-                    }, {
-                        "id": "tools",
-                        "icon": "terminal",
-                        "key": "tools"
-                    }, {
-                        "id": "settings",
-                        "icon": "settings",
-                        "key": "settings"
-                    }, {
-                        "id": "pin",
-                        "icon": root.held ? "pin-off" : "pin",
-                        "key": root.held ? "unpin" : "pin"
-                    }, {
-                        "id": "close",
-                        "icon": "x",
-                        "key": "close"
-                    }]
-
-                    Rectangle {
-                        required property var modelData
-
-                        objectName: "menu-" + modelData.id
-                        width: 192
-                        height: 28
-                        radius: 6
-                        color: menuHover.hovered ? "#22ffffff" : "transparent"
-
-                        Row {
-                            anchors.verticalCenter: parent.verticalCenter
-                            x: 9
-                            spacing: 9
-
-                            UI.Icon {
-                                name: modelData.icon
-                                size: 14
-                                opacity: 0.8
-                            }
-
-                            PlainLabel {
-                                text: root.t(modelData.key)
-                                font.pixelSize: 12
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-
-                        }
-
-                        HoverHandler {
-                            id: menuHover
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: {
-                                if (modelData.id === "pin") {
-                                    root.held = !root.held;
-                                    moreMenu.close();
-                                } else if (modelData.id === "close") {
-                                    root.close();
-                                } else {
-                                    root.openTab(modelData.id);
-                                }
-                            }
-                        }
-
-                    }
-
-                }
-
-            }
-
-        }
-
         Rectangle {
             visible: root.opened && !!root.model && root.model.feedback !== ""
             anchors.horizontalCenter: parent.horizontalCenter
@@ -742,15 +675,7 @@ BarWidget {
 
         }
 
-        mask: Region {
-            item: card
-
-            Region {
-                item: moreMenu.visible ? moreMenu.contentItem : null
-                intersection: Intersection.Combine
-            }
-
-        }
+        mask: Region { item: card }
 
     }
 

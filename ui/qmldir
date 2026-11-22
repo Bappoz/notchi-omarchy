@@ -22,4 +22,6 @@ HardwareHud 1.0 HardwareHud.qml
 CameraLight 1.0 CameraLight.qml
 SettingsButton 1.0 SettingsButton.qml
 NavigationDock 1.0 NavigationDock.qml
+VoiceHud 1.0 VoiceHud.qml
+CursorBuddy 1.0 CursorBuddy.qml
 MiniCalendar 1.0 MiniCalendar.qml

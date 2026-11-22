@@ -428,6 +428,21 @@ Item {
                 }
             }
 
+            PlainLabel {
+                text: root.t("settings.voiceHelp")
+                font.pixelSize: 11
+                color: "#b4b7c3"
+                wrapMode: Text.Wrap
+                Layout.fillWidth: true
+                Layout.topMargin: 5
+            }
+
+            NotchButton {
+                iconName: "emblem-voice"
+                text: root.t("settings.voice")
+                onClicked: if (root.model) root.model.exec(["superwhisper", "settings"])
+            }
+
             Item { Layout.fillHeight: true }
 
             NotchButton {

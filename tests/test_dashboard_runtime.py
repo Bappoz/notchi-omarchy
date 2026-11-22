@@ -130,7 +130,7 @@ class DashboardRuntimeTests(unittest.TestCase):
                     for sample, expected in [
                         ("volume", "volume"), ("camera", "camera"),
                         ("charging", "charging"), ("lowBattery", "lowBattery"), ("chargeFull", "chargeFull"),
-                        ("bluetooth", "headphones"), ("brightness", ""),
+                        ("bluetooth", "headphones"), ("voice", "voice"), ("brightness", ""),
                     ]:
                         hardware = json.loads(ipc("hardware", sample))
                         self.assertEqual(hardware["hud"], expected, hardware)
@@ -141,6 +141,7 @@ class DashboardRuntimeTests(unittest.TestCase):
                             time.sleep(.4)
                             self.assertEqual(ipc("hudState"), expected)
                             save("hardware-" + sample)
+                    self.assertEqual(ipc("voiceTab"), "calendar")
                     ipc("clear")
                     ipc("prepare", "fluid")
                     time.sleep(0.4)

@@ -5,6 +5,7 @@ var dock = [
     {id: "home", icon: "emblem-music", key: "media", color: "#ff8ba6"},
     {id: "agents", icon: "emblem-agents", key: "nav.agents", color: "#c7adff"},
     {id: "camera", icon: "emblem-camera", key: "nav.camera", color: "#81eb9f"},
+    {id: "voice", icon: "emblem-voice", key: "voice.title", action: "voice"},
     {id: "files", icon: "emblem-files", key: "nav.files", color: "#9dc9ff"},
     {id: "clipboard", icon: "emblem-clipboard", key: "nav.clipboard", color: "#a4d5ff"},
     {id: "focus", icon: "emblem-focus", key: "focus", color: "#ffc17c"},

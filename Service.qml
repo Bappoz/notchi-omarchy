@@ -47,6 +47,9 @@ Item {
   Timer { id: volumeHudTimer; interval: 1450; onTriggered: root.volumeHudActive = false }
 
   Local.Hardware { service: root }
+  Local.Voice { id: voiceAssistant; service: root }
+  readonly property alias voice: voiceAssistant
+  signal voiceTabRequested()
 
 
   function observeConnections(sample) {
@@ -407,6 +410,8 @@ Item {
   ShellIpc {
     target: "bappoz.notch.service"
     function refresh(): void { root.refresh() }
+    function voice(): void { voiceAssistant.toggle() }
+    function cancelVoice(): void { voiceAssistant.cancel() }
     function event(kind: string): string {
       var routes = {report: "", transfer: "", call: "", attention: "agents/activity", done: "agents/activity"}
       if (!Object.prototype.hasOwnProperty.call(routes, kind)) return "unsupported"

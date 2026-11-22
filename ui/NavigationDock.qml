@@ -44,7 +44,15 @@ Rectangle {
                 idleOpacity: .83
                 flatSelection: true
                 glyphMotion: root.host.motion
-                onClicked: root.host.openTab(modelData.id === "agents" ? "agents/activity" : modelData.id)
+                enabled: !modelData.action || !!root.host.model
+                onClicked: {
+                    if (modelData.action === "voice") {
+                        root.host.held = true
+                        root.host.model.voice.toggle()
+                    } else {
+                        root.host.openTab(modelData.id === "agents" ? "agents/activity" : modelData.id)
+                    }
+                }
             }
         }
     }

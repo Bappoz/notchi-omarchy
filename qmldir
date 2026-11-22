@@ -23,4 +23,5 @@ NotchSwitch 1.0 NotchSwitch.qml
 Clipboard 1.0 Clipboard.qml
 NotificationSource 1.0 NotificationSource.qml
 Hardware 1.0 Hardware.qml
+Voice 1.0 Voice.qml
 DesktopOsd 1.0 DesktopOsd.qml

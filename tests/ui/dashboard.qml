@@ -92,12 +92,22 @@ ShellRoot {
                 backend.observeConnections({devices:{}})
                 backend.observeConnections({devices:{fixture:{audio:true,inEar:true,name:"JBL Wave Beam 2",batteries:[{label:"device",level:82}]}}})
             }
+            if (test === "voice") {
+                backend.voice.level = .6
+                backend.voice.phase = "listening"
+            } else {
+                backend.voice.phase = ""
+            }
             var result = JSON.stringify({hud:notch.hudKind, level:backend.volumeHudLevel, standalone:desktopOsd.opened,
                 notice:backend.currentNotice.kind || ""})
             if (test === "brightness") desktopOsd.close()
             return result
         }
         function hudState():string { return notch.hudKind }
+        function voiceTab():string {
+            backend.voice.handle("Abra o calendário")
+            return notch.currentTab
+        }
         function timerState():string {
             backend.updateClock()
             backend.snapshot = Object.assign({},backend.snapshot,{timer:{end:backend.now+65}})

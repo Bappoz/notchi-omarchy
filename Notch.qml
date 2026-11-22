@@ -75,9 +75,15 @@ BarWidget {
             return (notice.provider === "claude" ? "Claude" : "Codex") + " · " + t("island." + notice.kind);
         return (notice.source ? notice.source + " · " : "") + t("island." + notice.kind);
     }
+    readonly property bool voiceShowing: !!model && !!model.voice.phase && focusedScreen
+    Connections {
+        target: root.model
+        function onVoiceTabRequested() { root.showRequestedTab() }
+    }
     readonly property string hudKind: {
         if (!model || opened) return "";
         if (!focusedScreen) return model.cameraInUse ? "camera" : "";
+        if (voiceShowing) return "voice";
         if (model.volumeHudActive) return "volume";
         if (fullscreen) return model.cameraInUse ? "camera" : "";
         if (activityPeek && ["charging", "lowBattery", "chargeFull"].includes(peekNotice.kind)) return peekNotice.kind;
@@ -420,7 +426,7 @@ BarWidget {
         id: window
 
         screen: root.islandScreen
-        visible: !!root.islandScreen && (!root.fullscreen || !!root.hudKind || root.hudProgress > 0)
+        visible: !!root.islandScreen && (!root.fullscreen || !!root.hudKind || root.hudProgress > 0 || !!(root.model && root.model.voice.guide))
         color: "transparent"
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.namespace: "bappoz-notch"
@@ -446,7 +452,7 @@ BarWidget {
             anchors.horizontalCenter: parent.horizontalCenter
             y: root.topInset - 3 * root.progress
             readonly property real regularWidth: root.pillWidth + (282 - root.pillWidth) * root.alertProgress
-            readonly property real hudWidth: root.deviceHud ? 286 : root.displayedHud === "volume" ? 306 : 234
+            readonly property real hudWidth: root.deviceHud ? 286 : ["volume", "voice"].includes(root.displayedHud) ? 306 : 234
             readonly property real compactSize: compactWidth + Math.max(0, 246 - compactWidth) * root.calendarProgress
             property real compactWidth: regularWidth + (hudWidth - regularWidth) * (root.hudKind ? 1 : 0)
             Behavior on compactWidth {
@@ -541,10 +547,17 @@ BarWidget {
                     visible: opacity > 0
                 }
 
+                Loader {
+                    anchors.fill: parent
+                    active: root.displayedHud === "voice" && !!root.model && root.hudProgress > 0
+                    sourceComponent: UI.VoiceHud { host: root }
+                    opacity: root.hudProgress
+                }
+
                 UI.HardwareHud {
                     anchors.fill: parent
                     host: root
-                    opacity: root.hudProgress
+                    opacity: root.displayedHud === "voice" ? 0 : root.hudProgress
                     visible: opacity > 0
                 }
 
@@ -725,8 +738,15 @@ BarWidget {
 
         }
 
+        UI.CursorBuddy {
+            guide: root.model ? root.model.voice.guide : null
+            screen: root.islandScreen
+            label: root.model ? root.model.voice.appName : ""
+            motion: root.motion
+        }
+
         Rectangle {
-            readonly property bool showing: root.opened && root.focusedScreen && !!root.model && root.model.volumeHudActive
+            readonly property bool showing: root.opened && root.focusedScreen && !!root.model && (root.model.volumeHudActive || root.voiceShowing)
             visible: opacity > 0
             opacity: showing ? 1 : 0
             anchors.horizontalCenter: parent.horizontalCenter
@@ -739,10 +759,20 @@ BarWidget {
 
             Behavior on opacity { NumberAnimation { duration: root.motion ? Style.duration(150) : 0 } }
 
-            UI.HardwareHud {
+            Loader {
                 anchors.fill: parent
-                host: root
-                kind: "volume"
+                active: parent.visible
+                sourceComponent: root.voiceShowing ? voiceOverlay : volumeOverlay
+            }
+
+            Component {
+                id: voiceOverlay
+                UI.VoiceHud { host: root }
+            }
+
+            Component {
+                id: volumeOverlay
+                UI.HardwareHud { host: root; kind: "volume" }
             }
         }
 

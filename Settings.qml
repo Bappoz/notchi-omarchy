@@ -346,6 +346,35 @@ Item {
 
                 }
 
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 3
+
+                        PlainLabel {
+                            text: root.t("desktopNotices")
+                            font.pixelSize: 11
+                            Layout.fillWidth: true
+                        }
+
+                        PlainLabel {
+                            text: root.t("desktopNoticesHint")
+                            font.pixelSize: 10
+                            color: "#b5b5bf"
+                            wrapMode: Text.Wrap
+                            Layout.fillWidth: true
+                        }
+                    }
+
+                    NotchSwitch {
+                        checked: !!root.model && root.model.preferences.desktopNotices === "true"
+                        Accessible.name: root.t("desktopNotices")
+                        onToggled: root.model.action("setting", ["desktopNotices", String(checked)])
+                    }
+                }
+
                 PlainLabel {
                     text: root.t("shortcuts")
                     font.pixelSize: 9

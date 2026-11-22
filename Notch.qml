@@ -19,34 +19,87 @@ BarWidget {
     readonly property var model: Local.Runtime.model
     readonly property var player: model ? model.player : null
     property bool opened: false
-    property var peekNotice:({kind:"agent"})
-    property string peekProvider:"codex"
-    property string peekActivity:"working"
-    property bool activityPeek:false
-    property real peekProgress:activityPeek&&!opened?1:0
-    Behavior on peekProgress{NumberAnimation{duration:root.motion?Style.duration(200):0;easing.type:Easing.OutCubic}}
+    readonly property var peekNotice: model ? model.currentNotice : ({})
+    readonly property bool activityPeek: !opened && focusedScreen && !!peekNotice.kind
+    readonly property var recentNotice: model ? model.recentNotice : ({})
+    readonly property string signalKind: activityPeek ? peekNotice.kind
+        : player && player.isPlaying ? "media"
+        : model && model.activeAgent ? "working"
+        : recentNotice.kind || (model && model.islandClock ? "timer" : "")
+    readonly property string signalIcon: {
+        var icons = {
+            "done": "circle-check",
+            "attention": "bell", "weather": "cloud-sun", "timer": "timer",
+            "call": "headphones", "transfer": "arrow-down-to-line",
+            "chat": "bell", "report": "file-text", "notification": "bell",
+            "wifi": "wifi", "headphones": "headphones"
+        };
+        return icons[signalKind] || "";
+    }
+    readonly property color signalTint: {
+        var source = activityPeek ? peekNotice.source : (recentNotice.kind === signalKind ? recentNotice.source : "");
+        if (signalKind === "media" || source === "WhatsApp") return "#50df9b";
+        if (signalKind === "wifi") return "#78bbff";
+        if (signalKind === "headphones") return "#7ce9b9";
+        if (source === "Discord") return "#9c9dff";
+        if (signalKind === "working" || signalKind === "agent")
+            return (activityPeek ? peekNotice.provider === "claude" : model && model.activeProviders.includes("claude"))
+                ? "#ef9d77" : "#84edbd";
+        if (["media", "call", "done", "transfer"].includes(signalKind)) return "#a2e9cc";
+        if (["attention", "timer"].includes(signalKind)) return "#ffc17c";
+        return "#c5c8d8";
+    }
+    readonly property string noticeLabel: {
+        var notice = peekNotice.kind ? peekNotice : recentNotice;
+        if (!notice.kind) return "";
+        if (notice.kind === "weather")
+            return t("weatherAlert." + notice.event.kind);
+        if (notice.provider)
+            return (notice.provider === "claude" ? "Claude" : "Codex") + " · " + t("island." + notice.kind);
+        return (notice.source ? notice.source + " · " : "") + t("island." + notice.kind);
+    }
+    readonly property string islandState: opened ? "expanded" : activityPeek ? "alert"
+        : signalKind || (model && model.islandClock) ? "compact" : "idle"
+    property real alertProgress: activityPeek ? 1 : 0
+    Behavior on alertProgress {
+        NumberAnimation { duration: root.motion ? Style.duration(300) : 0; easing.type: Easing.OutCubic }
+    }
     property bool held: false
     property bool replayPinned: false
     property bool grabReady: false
     property bool focusPrimed: false
-    property string currentTab: "home"
+    property string currentTab: "quick"
     property string subtab: ""
     property int direction: 1
-    readonly property var tabs: ["home", "files", "clipboard", "focus", "camera", "agents", "calendar", "tools", "system", "daily", "weather"]
+    readonly property var tabs: ["home", "files", "clipboard", "focus", "camera", "agents", "calendar", "tools", "system", "daily", "weather", "quick"]
     readonly property bool motion: setting("animations", true) && (!model || model.preferences.animations !== "false") && Style.duration(100)>0
     readonly property string theme: model && model.preferences.theme ? model.preferences.theme : setting("theme", "glass")
     readonly property string animationStyle: model && model.preferences.animationStyle ? model.preferences.animationStyle : setting("animationStyle", "fluid")
     readonly property var animationProfile: Motion.profile(animationStyle)
-    readonly property bool spatial: animationStyle.indexOf("3D") >= 0
+    readonly property bool spatial: motion && animationStyle.indexOf("3D") >= 0
     readonly property bool spatialTransition: spatial && progress > .001 && progress < .999
     readonly property bool hoverEnabled: !model || model.preferences.hover !== "false"
-    readonly property string screenName: pill.QsWindow.window && pill.QsWindow.window.screen ? pill.QsWindow.window.screen.name : ""
+    readonly property var islandScreen: root.QsWindow.window ? root.QsWindow.window.screen : null
+    readonly property string screenName: islandScreen ? islandScreen.name : ""
     readonly property bool focusedScreen: !Hyprland.focusedMonitor || Hyprland.focusedMonitor.name === screenName
     readonly property string compactTime: clock.date.toLocaleTimeString(Qt.locale(I18n.formatLocale), "HH:mm")
-    readonly property string compactDate: clock.date.toLocaleDateString(Qt.locale(I18n.formatLocale), "ddd, d MMM")
-    readonly property int expandedWidth: currentTab === "agents" ? 748 : 708
-    readonly property int expandedHeight: Math.min(Motion.height(currentTab, subtab), window.height - 40)
-    readonly property int pillWidth: model && model.remaining > 0 ? 284 : 268
+    readonly property string compactDate: clock.date.toLocaleDateString(Qt.locale(I18n.formatLocale), "ddd d")
+    readonly property int topInset: 8
+    readonly property bool topBar: bar && bar.position === "top"
+    readonly property bool connectionAlert: activityPeek && ["wifi", "headphones"].includes(peekNotice.kind)
+    readonly property int expandedWidth: currentTab === "quick" ? 376 : currentTab === "agents" ? 748 : 708
+    readonly property int expandedHeight: Math.max(42, Math.min(
+        currentTab === "quick" ? (player ? 190 : 150) : Motion.height(currentTab, subtab),
+        window.height - topInset - 50))
+    property real pillWidth: {
+        var agents = model ? model.activeProviders.length : 0;
+        var statusWidth = model && model.islandClock ? 44 : 0;
+        if (signalIcon) statusWidth += 26;
+        return Math.max(166, 104 + 2 * Math.max(agents * 23, statusWidth));
+    }
+    Behavior on pillWidth {
+        NumberAnimation { duration: root.motion ? Style.duration(220) : 0; easing.type: Easing.OutCubic }
+    }
     readonly property bool pageReady: page.status === Loader.Ready
     readonly property bool pageError: page.status === Loader.Error
     property real reveal: opened ? 1 : 0
@@ -57,10 +110,9 @@ BarWidget {
     }
 
     function openOnFocusedScreen() {
-        if (focusedScreen) {
-            held = true;
-            open();
-        }
+        if (!focusedScreen) return;
+        held = true;
+        if (!opened) openTab("quick");
     }
 
     function toggleOnFocusedScreen() {
@@ -72,7 +124,7 @@ BarWidget {
     function showRequestedTab() {
         if (focusedScreen) {
             held = true;
-            openTab(model ? model.requestedTab : "home");
+            openTab(model ? model.requestedTab : "quick");
         }
 
     }
@@ -94,6 +146,7 @@ BarWidget {
         if (!opened)
             return ;
 
+        moreMenu.close();
         opened = false;
         held = false;
         if (model)
@@ -109,7 +162,20 @@ BarWidget {
             close();
         } else {
             held = true;
-            open();
+            openTab("quick");
+        }
+    }
+
+    function showMenu() { moreMenu.open(); }
+
+    function activateIsland() {
+        if (activityPeek && model) {
+            var tab = peekNotice.tab || "quick";
+            model.dismissNotice();
+            held = true;
+            openTab(tab);
+        } else {
+            toggle();
         }
     }
 
@@ -150,16 +216,16 @@ BarWidget {
     }
 
     moduleName: "bappoz.notch"
-    implicitWidth: pillWidth
+    implicitWidth: topBar ? pillWidth : vertical ? barSize : 24
     implicitHeight: barSize
     onOpenedChanged: {
-        if(opened)activityPeek=false;
+        if (opened) hoverTimer.stop();
         grabReady = false;
         focusPrimed = false;
         if (opened)
             primeTimer.restart();
         else
-            moreMenu.close();
+            leaveTimer.stop();
     }
     onHeldChanged: {
         if (held && opened) {
@@ -189,10 +255,10 @@ BarWidget {
                 ? root.bar.moduleWidgets(root.moduleName) : [root];
             return JSON.stringify({
                 opened: root.opened, tab: root.currentTab, screen: root.screenName,
-                activityPeek:root.activityPeek,peekProvider:root.peekProvider,peekActivity:root.peekActivity, service: !!root.model, pageReady: root.pageReady, pageError: root.pageError,
+                state: root.islandState, activityPeek: root.activityPeek, service: !!root.model, pageReady: root.pageReady, pageError: root.pageError,
                 pageMode: page.item && "mode" in page.item ? page.item.mode : "",
                 pageHasModel: !!page.item && !!page.item.model,
-                animation: root.animationStyle, width: card.width, height: card.height,
+                animation: root.animationStyle, y: card.y, width: card.width, height: card.height,
                 instances: widgets.map(function(widget) {
                     return {screen: widget.screenName, opened: widget.opened,
                         tab: widget.currentTab, pageReady: widget.pageReady,
@@ -202,45 +268,14 @@ BarWidget {
         }
     }
 
-    Connections {
-        target:root.model
-        function onNoticeReady(){
-            var n=root.model.currentNotice
-            root.peekNotice=n;root.peekProvider=n.provider||"codex";root.peekActivity=n.activity||"working"
-            if(root.focusedScreen&&!root.opened){root.activityPeek=true;peekTimer.restart()}
-        }
-        function onAgentActivityStarted(provider,activity){
-            root.peekNotice={kind:"agent"};
-            root.peekProvider=provider||"codex";root.peekActivity=activity||"working";
-            if(root.focusedScreen&&!root.opened){root.activityPeek=true;peekTimer.restart()}
-        }
-    }
-    Timer{id:peekTimer;interval:5000;onTriggered:root.activityPeek=false}
-    PanelWindow {
-        id:peekWindow
-        screen:pill.QsWindow.window?pill.QsWindow.window.screen:null
-        anchors{top:true}
-        implicitWidth:370;implicitHeight:94
-        visible:root.peekProgress>.001
-        color:"transparent"
-        exclusionMode:ExclusionMode.Ignore
-        WlrLayershell.namespace:"bappoz-notch"
-        WlrLayershell.layer:WlrLayer.Overlay
-        WlrLayershell.keyboardFocus:WlrKeyboardFocus.None
-        NotchShape{anchors.horizontalCenter:parent.horizontalCenter;width:268+102*root.peekProgress;height:28+66*root.peekProgress;topRadius:14;bottomRadius:20;fill:"#f20c0c0e";stroke:"#35ffffff";glass:true}
-        RowLayout {
-            anchors.fill:parent;anchors.margins:18;spacing:12
-            opacity:root.peekProgress
-            UI.AgentPet{visible:root.peekNotice.kind!=="weather";provider:root.peekProvider;activity:root.peekActivity;motion:root.motion&&root.activityPeek;Layout.preferredWidth:58;Layout.preferredHeight:52}
-            UI.WeatherScene{visible:root.peekNotice.kind==="weather";kind:root.peekNotice.event?root.peekNotice.event.kind:"clear";motion:root.motion&&root.activityPeek;Layout.preferredWidth:58;Layout.preferredHeight:52}
-            ColumnLayout {
-                Layout.fillWidth:true;spacing:5
-                PlainLabel{text:root.peekNotice.kind==="weather"?root.t("weatherAlert."+(root.peekNotice.event?root.peekNotice.event.kind:"temperature")):root.t("agentsWorking")+" · "+(root.peekProvider==="codex"?"Codex":"Claude");font.pixelSize:12;font.weight:Font.DemiBold;Layout.fillWidth:true}
-                PlainLabel{text:root.peekNotice.kind==="weather"?(root.peekNotice.event.temperature+"° · "+root.t("humidity")+" "+root.peekNotice.event.humidity+"%"):root.model?root.model.sessions.filter(function(s){return s.working&&s.provider===root.peekProvider}).map(function(s){return (s.provider==="claude"?"Claude":"Codex")+" · "+s.project}).slice(0,2).join("\n"):"";font.pixelSize:10;color:"#ada9a4";Layout.fillWidth:true}
-            }
-            UI.Icon{name:"chevron-right";size:14;opacity:.55}
-        }
-        MouseArea{anchors.fill:parent;cursorShape:Qt.PointingHandCursor;onClicked:{root.activityPeek=false;root.openTab(root.peekNotice.kind==="weather"?"weather":"agents/activity")}}
+    UI.IconButton {
+        anchors.centerIn: parent
+        visible: !root.topBar
+        implicitWidth: 24
+        implicitHeight: 24
+        iconName: "circle-dot"
+        hint: root.t("island.open")
+        onClicked: root.toggle()
     }
 
     Translations {
@@ -277,71 +312,6 @@ BarWidget {
         }
     }
 
-    Item {
-        id: pill
-        objectName: "notch-pill"
-
-        anchors.fill: parent
-        opacity: 1 - root.progress
-
-        NotchShape {
-            anchors.fill: parent
-            topRadius: 6
-            bottomRadius: 10
-            fill: root.theme === "midnight" ? "#000000" : "#ed09090b"
-            stroke: "#22ffffff"
-            glass: false
-        }
-
-        UI.Vinyl {
-            width: 22
-            height: 22
-            x: 16
-            anchors.verticalCenter: parent.verticalCenter
-            tonearm: false
-            playing: !!root.player && root.player.isPlaying
-            artwork: root.player ? root.player.trackArtUrl : ""
-            motionEnabled: root.motion
-        }
-
-        PlainLabel {
-            anchors.centerIn: parent
-            text: root.model && root.model.remaining > 0 ? root.compactTime + "  ·  " + root.model.countdown : root.compactTime + "  ·  " + root.compactDate
-            font.pixelSize: 10
-            font.weight: Font.Medium
-            color: "#d1d1d6"
-        }
-
-        UI.Waveform {
-            x: parent.width - width - 17
-            anchors.verticalCenter: parent.verticalCenter
-            width: 23
-            height: 18
-            maximumHeight: 18
-            playing: !!root.player && root.player.isPlaying
-            motionEnabled: root.motion
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            objectName: "notch-pill-input"
-            onEntered: {
-                if (root.hoverEnabled) {
-                    hoverTimer.restart();
-                }
-            }
-            onExited: hoverTimer.stop()
-            onClicked: root.toggle()
-            onWheel: function(event) {
-                if (root.model)
-                    root.model.exec(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", event.angleDelta.y > 0 ? "2%+" : "2%-"]);
-
-            }
-        }
-
-    }
-
     Timer {
         id: primeTimer
 
@@ -356,11 +326,10 @@ BarWidget {
     Timer {
         id: hoverTimer
 
-        interval: Math.max(100, Math.min(1000, Number(root.setting("hoverDelay", 150))))
+        interval: Math.max(100, Math.min(1000, Number(root.setting("hoverDelay", 220))))
         onTriggered: {
-            if (root.hoverEnabled) {
-                root.open();
-            }
+            if (root.hoverEnabled && !root.opened && !root.activityPeek && pillInput.containsMouse)
+                root.openTab("quick");
         }
     }
 
@@ -369,7 +338,7 @@ BarWidget {
 
         interval: 330
         onTriggered: {
-            if (!root.held && !surfaceHover.hovered && !moreMenu.visible) {
+            if (root.opened && !root.held && !surfaceHover.hovered && !moreMenu.visible) {
                 root.close();
             }
         }
@@ -378,8 +347,8 @@ BarWidget {
     PanelWindow {
         id: window
 
-        screen: pill.QsWindow.window ? pill.QsWindow.window.screen : null
-        visible: root.opened || root.progress > 0.001 || revealAnimation.running
+        screen: root.islandScreen
+        visible: !!root.islandScreen
         color: "transparent"
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.namespace: "bappoz-notch"
@@ -394,7 +363,7 @@ BarWidget {
         }
 
         HyprlandFocusGrab {
-            windows: pill.QsWindow.window ? [window, pill.QsWindow.window] : [window]
+            windows: root.QsWindow.window ? [window, root.QsWindow.window] : [window]
             active: root.opened && root.held && root.grabReady
             onCleared: root.close()
         }
@@ -403,11 +372,23 @@ BarWidget {
             id: card
 
             anchors.horizontalCenter: parent.horizontalCenter
-            y: 0
-            width: root.spatial ? Math.min(root.expandedWidth, window.width - 24) : root.pillWidth + (Math.min(root.expandedWidth, window.width - 24) - root.pillWidth) * root.reveal
-            height: root.spatial ? root.expandedHeight : root.barSize + (root.expandedHeight - root.barSize) * root.reveal
+            y: root.topInset - 3 * root.progress
+            readonly property real compactWidth: root.pillWidth + (282 - root.pillWidth) * root.alertProgress
+            readonly property real compactHeight: 38 + 8 * root.alertProgress
+            readonly property real targetWidth: Math.max(0, Math.min(root.expandedWidth, window.width - 24))
+            property real expandedTargetWidth: targetWidth
+            property real expandedTargetHeight: root.expandedHeight
+            Behavior on expandedTargetWidth {
+                enabled: root.opened
+                NumberAnimation { duration: root.motion ? Style.duration(240) : 0; easing.type: Easing.OutCubic }
+            }
+            Behavior on expandedTargetHeight {
+                enabled: root.opened
+                NumberAnimation { duration: root.motion ? Style.duration(240) : 0; easing.type: Easing.OutCubic }
+            }
+            width: Math.max(0, Math.min(window.width - 16, compactWidth + (expandedTargetWidth - compactWidth) * Math.max(0, root.reveal)))
+            height: Math.max(0, Math.min(window.height - y, compactHeight + (expandedTargetHeight - compactHeight) * Math.max(0, root.reveal)))
             clip: true
-            opacity: root.spatial ? Math.min(1, root.progress * 3) : 1
             focus: root.opened
             Keys.onEscapePressed: root.close()
             Keys.onPressed: function(event) {
@@ -423,15 +404,53 @@ BarWidget {
                 id: liveSurface
                 objectName: "notch-live-surface"
                 anchors.fill: parent
-            NotchShape {
-                id: background
-
+            Rectangle {
                 anchors.fill: parent
-                topRadius: 14
-                bottomRadius: 30
-                fill: root.theme === "midnight" ? "#000000" : root.theme === "frosted" ? "#ee252527" : "#d51c1c1e"
-                glass: root.theme !== "midnight"
-                stroke: root.theme === "midnight" ? "#24ffffff" : "#46ffffff"
+                radius: (19 + 4 * root.alertProgress) + 9 * root.progress
+                color: root.theme === "midnight" ? "#09090c" : root.theme === "frosted" ? "#f52a2a32" : "#f518181f"
+                border.width: 1
+                border.color: Qt.tint("#34343f", Qt.alpha(root.signalTint, .28 * root.alertProgress))
+            }
+
+            UI.IslandOrbit {
+                objectName: "notch-orbit"
+                anchors.fill: parent
+                radius: 19 + 4 * root.alertProgress + 9 * root.progress
+                tint: root.signalTint
+                opacity: 1 - root.progress
+                running: root.progress < .99 && ["media", "working"].includes(root.signalKind)
+                alertAt: root.activityPeek ? root.peekNotice.queuedAt : 0
+                motion: root.motion
+            }
+
+            UI.IslandCompact {
+                id: pill
+                objectName: "notch-pill"
+                width: card.compactWidth
+                height: card.compactHeight
+                anchors.horizontalCenter: parent.horizontalCenter
+                host: root
+                opacity: Math.max(0, 1 - root.progress * 3.5)
+                visible: opacity > 0
+
+                MouseArea {
+                    id: pillInput
+                    objectName: "notch-pill-input"
+                    anchors.fill: parent
+                    enabled: !root.opened
+                    hoverEnabled: enabled
+                    cursorShape: Qt.PointingHandCursor
+                    onEntered: if (root.hoverEnabled && !root.activityPeek) hoverTimer.restart()
+                    onExited: hoverTimer.stop()
+                    onClicked: root.activateIsland()
+                    onWheel: function(event) {
+                        if (root.model && event.angleDelta.y)
+                            root.model.exec(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", event.angleDelta.y > 0 ? "2%+" : "2%-"]);
+                    }
+                    Accessible.role: Accessible.Button
+                    Accessible.name: root.t("island.open")
+                    Accessible.onPressAction: root.activateIsland()
+                }
             }
 
             HoverHandler {
@@ -465,10 +484,11 @@ BarWidget {
             Item {
                 id: content
 
-                width: Math.min(root.expandedWidth, window.width - 24) - 64
-                height: root.expandedHeight - 14
+                width: Math.max(0, card.expandedTargetWidth - (root.currentTab === "quick" ? 32 : 56))
+                height: Math.max(0, card.expandedTargetHeight - 22)
+                enabled: root.opened
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: root.spatial ? 0 : root.animationProfile.offset * (1 - root.progress)
+                y: 11 + (root.spatial ? 0 : root.animationProfile.offset * (1 - root.progress))
                 opacity: Math.max(0, Math.min(1, (root.progress - 0.1) / 0.65))
                 scale: root.spatial ? 1 : root.animationProfile.scale + (1 - root.animationProfile.scale) * root.progress
                 transformOrigin: Item.Top
@@ -476,6 +496,8 @@ BarWidget {
 
                 UI.Header {
                     id: header
+                    visible: root.currentTab !== "quick"
+                    height: visible ? implicitHeight : 0
                     enabled: !root.spatialTransition
 
                     anchors.top: parent.top
@@ -506,9 +528,11 @@ BarWidget {
                     }
 
                     clip: true
+                    active: root.opened || (root.progress > .001 && root.currentTab !== "camera")
                     opacity: arrival
                     source: {
                         var files = {
+                            "quick": "Quick.qml",
                             "home": "Home.qml",
                         "system": "System.qml",
                         "daily": "Daily.qml",
@@ -563,13 +587,10 @@ BarWidget {
 
             }
 
-            NotchShape {
+            Rectangle {
                 anchors.fill: parent
-                topRadius: 14
-                bottomRadius: 30
-                fill: Qt.rgba(0, 0, 0, root.spatial ? Math.max(0, (root.animationProfile.shade || 0) * (1 - root.progress)) : 0)
-                stroke: "transparent"
-                glass: false
+                radius: 19 + 9 * root.progress
+                color: Qt.rgba(0, 0, 0, Math.max(0, (root.animationProfile.shade || 0) * (1 - root.progress)))
                 visible: root.spatial && root.progress < 0.995
             }
 
@@ -593,8 +614,8 @@ BarWidget {
             onClosed: if (root.opened && !root.held) leaveTimer.restart()
 
             parent: window.contentItem
-            x: card.x + card.width - 230
-            y: 30
+            x: Math.max(8, card.x + card.width - width - 12)
+            y: card.y + 40
             width: 204
             padding: 6
             closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
@@ -611,6 +632,18 @@ BarWidget {
 
                 Repeater {
                     model: [{
+                        "id": "quick",
+                        "icon": "circle-dot",
+                        "key": "island.open"
+                    }, {
+                        "id": "home",
+                        "icon": "music-2",
+                        "key": "media"
+                    }, {
+                        "id": "daily",
+                        "icon": "list-todo",
+                        "key": "nav.daily"
+                    }, {
                         "id": "calendar",
                         "icon": "calendar",
                         "key": "calendar"
@@ -635,6 +668,7 @@ BarWidget {
                     Rectangle {
                         required property var modelData
 
+                        objectName: "menu-" + modelData.id
                         width: 192
                         height: 28
                         radius: 6
@@ -688,7 +722,7 @@ BarWidget {
         Rectangle {
             visible: root.opened && !!root.model && root.model.feedback !== ""
             anchors.horizontalCenter: parent.horizontalCenter
-            y: card.height + 8
+            y: card.y + card.height + 8
             width: Math.min(480, feedback.implicitWidth + 30)
             height: 30
             radius: 15
@@ -709,7 +743,7 @@ BarWidget {
         }
 
         mask: Region {
-            item: root.opened ? card : null
+            item: card
 
             Region {
                 item: moreMenu.visible ? moreMenu.contentItem : null

@@ -1,4 +1,5 @@
 import "." as Local
+import "ui/IslandEvents.js" as Events
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -13,21 +14,61 @@ Item {
   property var snapshot: ({})
   property var telemetry: ({})
   readonly property var sessions: telemetry.sessions || []
-  property var lastWorking: []
+  readonly property var activeAgent: sessions.find(function(session) { return session.working }) || null
+  readonly property var activeProviders: ["claude", "codex"].filter(function(provider) {
+    return sessions.some(function(session) { return session.provider === provider && session.working })
+  })
+  property var lastAgentStates: null
+  property int noticeEpoch: 0
+  property var previousConnections: ({})
+  property bool connectionProbeBusy: false
+
+  function observeConnections(sample) {
+    var previous = previousConnections
+    previousConnections = sample
+    for (var kind of Events.newConnections(previous, sample)) enqueueNotice({kind: kind})
+  }
+
+  function pollConnections() {
+    if (connectionProbeBusy || !sessionAvailable) return
+    connectionProbeBusy = true
+    var epoch = noticeEpoch
+    job.createObject(root, {
+      argv: ["/usr/bin/python3", eventAdapter, "connections"],
+      callback: function(sample) {
+        connectionProbeBusy = false
+        if (noticeClock() && sessionAvailable && epoch === noticeEpoch) observeConnections(sample)
+      }
+    })
+  }
+
+  Timer {
+    interval: 3000
+    repeat: true
+    running: root.pollingEnabled && root.sessionAvailable
+    triggeredOnStart: true
+    onTriggered: root.pollConnections()
+  }
   property bool telemetryBusy:false
   readonly property bool quotaUpdating:quotaProcess.running
-  signal agentActivityStarted(string provider, string activity)
-  function pollTelemetry(){
-    if(telemetryBusy)return
-    telemetryBusy=true
-    job.createObject(root,{argv:["python3",backendPath,"telemetry"],callback:function(data){
-      telemetryBusy=false
-      if(!data.ok)return
-      var current=(data.sessions||[]).filter(function(s){return s.working}).map(function(s){return s.id})
-      var started=(data.sessions||[]).filter(function(s){return s.working&&root.lastWorking.indexOf(s.id)<0})
-      telemetry=data;lastWorking=current
-      if(started.length)enqueueNotice({kind:"agent",provider:started[0].provider,activity:started[0].activity||"working"})
+  function pollTelemetry() {
+    if (telemetryBusy) return
+    telemetryBusy = true
+    var epoch = noticeEpoch
+    job.createObject(root, {argv: ["python3", backendPath, "telemetry"], callback: function(data) {
+      telemetryBusy = false
+      if (!data.ok) return
+      telemetry = data
+      if (epoch !== noticeEpoch || !sessionAvailable) return
+      observeAgents(data.sessions || [])
     }})
+  }
+
+  function observeAgents(rows) {
+    var previous = lastAgentStates
+    lastAgentStates = Events.agentStates(rows)
+    if (!previous) return
+    for (var event of Events.agentEvents(previous, rows)) enqueueNotice(event)
   }
   function refreshQuotas(force){
     if(quotaProcess.running)return
@@ -76,36 +117,118 @@ Item {
   function refreshWeather(force){
     if(weatherBusy||(!pollingEnabled&&!force))return
     weatherBusy=true
+    var epoch = noticeEpoch
     job.createObject(root,{argv:["python3",backendPath,"weather-panel"].concat(force?["force"]:[]),callback:function(data){
       weatherBusy=false
-      if(data.ok&&data.weather){weather=data.weather;if(data.weatherAlert)enqueueNotice({kind:"weather",event:data.weatherAlert})}
+      if(data.ok&&data.weather){weather=data.weather;if(data.weatherAlert && epoch === noticeEpoch)enqueueNotice({kind:"weather",event:data.weatherAlert,tab:"weather"})}
     }})
   }
   Timer{interval:60000;running:root.pollingEnabled;repeat:true;triggeredOnStart:true;onTriggered:root.refreshWeather(false)}
-  property var noticeQueue:[]
-  property var currentNotice:({})
-  property var noticeSeen:[]
-  property double lastNoticePoll:Date.now()
-  signal noticeReady()
-  function enqueueNotice(value){
-    var id=value.kind==="weather"?value.event.id:"agent:"+value.provider+":"+Math.floor(Date.now()/5000)
-    if(noticeSeen.indexOf(id)>=0)return
-    noticeSeen=noticeSeen.concat([id]).slice(-40)
-    // Keep notices brief and bounded. Weather never interrupts an active agent notice.
-    value.queuedAt=Date.now()
-    noticeQueue=noticeQueue.filter(function(n){return !(n.kind===value.kind&&(n.kind==="weather"||n.provider===value.provider))}).concat([value]).slice(-4)
+  property var noticeQueue: []
+  property var currentNotice: ({})
+  property var recentNotice: ({})
+  property var noticeSeen: []
+  property double lastNoticePoll: Date.now()
+  property double sessionConfirmedAt: 0
+  readonly property bool sessionAvailable: !pollingEnabled || sessionConfirmedAt > 0
+  readonly property string eventAdapter: decodeURIComponent(Qt.resolvedUrl("island_events.py").toString().replace(/^file:\/\//, ""))
+
+  onSessionAvailableChanged: if (!sessionAvailable) clearNotices()
+
+  function clearNotices() {
+    noticeEpoch++
+    lastAgentStates = null
+    previousConnections = ({})
+    noticeQueue = []
+    noticeSeen = []
+    recentNotice = ({})
+    dismissNotice()
+  }
+
+  function dismissNotice() {
+    noticeTimer.stop()
+    currentNotice = ({})
+  }
+
+  function noticeClock() {
+    var now = Date.now()
+    var gap = now - lastNoticePoll
+    lastNoticePoll = now
+    if (gap < 0 || gap > 8000) {
+      sessionConfirmedAt = 0
+      clearNotices()
+      return 0
+    }
+    if (now - sessionConfirmedAt > 5000) sessionConfirmedAt = 0
+    return now
+  }
+
+  function enqueueNotice(value) {
+    var now = noticeClock()
+    if (!now || !sessionAvailable || Events.priority[value.kind] === undefined) return false
+    var group = [value.kind, value.provider || value.source || ""].join(":")
+    var id = value.kind === "weather" ? value.event.id : group
+    if (noticeSeen.some(function(seen) { return seen.id === id && now - seen.at < 6000 })) return false
+    noticeSeen = noticeSeen.filter(function(seen) { return now - seen.at < 6000 })
+      .concat([{id: id, at: now}]).slice(-40)
+    noticeQueue = Events.queue(noticeQueue, Object.assign({group: group, queuedAt: now}, value))
     pumpNotices()
+    return true
   }
-  function pumpNotices(){
-    var now=Date.now(),gap=now-lastNoticePoll;lastNoticePoll=now
-    if(gap>20000){noticeQueue=[];currentNotice=({});return}
-    noticeQueue=noticeQueue.filter(function(n){return now-n.queuedAt<20000})
-    if(!noticeQueue.length||noticeTimer.running||expandedCount>0)return
-    currentNotice=noticeQueue[0];noticeQueue=noticeQueue.slice(1)
-    noticeReady();noticeTimer.start()
+
+  function pumpNotices() {
+    var now = noticeClock()
+    if (!now || !sessionAvailable) return
+    noticeQueue = noticeQueue.filter(function(event) { return now - event.queuedAt < 16000 })
+    if (recentNotice.kind && now - recentNotice.queuedAt >= 300000) recentNotice = ({})
+    if (!noticeQueue.length || expandedCount > 0) return
+    var next = noticeQueue[0]
+    if (noticeTimer.running && (next.kind !== "call" || currentNotice.kind === "call")) return
+    noticeQueue = noticeQueue.slice(1)
+    currentNotice = next
+    recentNotice = next
+    noticeTimer.restart()
   }
-  Timer{id:noticeTimer;interval:5400;onTriggered:root.currentNotice=({})}
-  Timer{interval:1000;running:true;repeat:true;onTriggered:root.pumpNotices()}
+
+  Timer {
+    id: noticeTimer
+    interval: 4800
+    onTriggered: {
+      root.currentNotice = ({})
+      root.pumpNotices()
+    }
+  }
+
+  Timer { interval: 1000; running: true; repeat: true; onTriggered: root.pumpNotices() }
+
+  Process {
+    id: sessionProbe
+    property double startedAt: 0
+    command: ["/usr/bin/python3", root.eventAdapter, "session"]
+    onStarted: startedAt = Date.now()
+    onExited: function(code) { root.sessionConfirmedAt = code === 0 && Date.now() - startedAt < 3600 ? startedAt : 0 }
+  }
+
+  Timer {
+    interval: 2400
+    running: root.pollingEnabled
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: sessionProbe.running = true
+  }
+
+  NotificationSource {
+    enabledSource: root.pollingEnabled && root.preferences.desktopNotices === "true"
+    onReceived: function(event) { root.enqueueNotice(event) }
+    onQuietChanged: if (quiet) root.clearDesktopNotices()
+    onEnabledSourceChanged: if (!enabledSource) root.clearDesktopNotices()
+  }
+
+  function clearDesktopNotices() {
+    noticeQueue = noticeQueue.filter(function(event) { return !event.source })
+    if (currentNotice.source) dismissNotice()
+    if (recentNotice.source) recentNotice = ({})
+  }
 
   property var clips: []
   property var ports: []
@@ -132,7 +255,7 @@ Item {
   property int busy: 0
   property int expandedCount: 0
   property bool refreshing: false
-  property string requestedTab: "home"
+  property string requestedTab: "quick"
   property string selectedPlayer: ""
   readonly property var players: Mpris.players.values
   readonly property var player: {
@@ -152,7 +275,32 @@ Item {
   readonly property var preferences: snapshot.settings || ({})
   property double now: Date.now()/1000
   readonly property int remaining: Math.max(0, Math.ceil(Number(timer.end || 0)-now))
-  readonly property string countdown: Math.floor(remaining/60) + ":" + String(remaining%60).padStart(2,"0")
+  readonly property string countdown: formatDuration(remaining)
+  property double stopwatchStart: 0
+  property double stopwatchElapsed: 0
+  readonly property string stopwatchText: formatDuration(Math.max(0, Math.floor((stopwatchElapsed
+    + (stopwatchStart ? now * 1000 - stopwatchStart : 0)) / 1000)))
+  readonly property string islandClock: remaining > 0 ? countdown : stopwatchStart ? stopwatchText : ""
+
+  function formatDuration(seconds) {
+    return Math.floor(seconds / 60) + ":" + String(seconds % 60).padStart(2, "0")
+  }
+
+  function toggleStopwatch() {
+    updateClock()
+    if (stopwatchStart) {
+      stopwatchElapsed += Math.max(0, now * 1000 - stopwatchStart)
+      stopwatchStart = 0
+    } else {
+      stopwatchStart = now * 1000
+    }
+  }
+
+  function updateClock() {
+    var hadTimer = remaining > 0
+    now = Date.now() / 1000
+    if (hadTimer && !remaining) enqueueNotice({kind: "timer", tab: "focus"})
+  }
 
   Component.onCompleted: Local.Runtime.model = root
   Component.onDestruction: if(Local.Runtime.model === root)Local.Runtime.model = null
@@ -170,6 +318,7 @@ Item {
     }})
   }
   function applyStatus(data,revision){
+    updateClock()
     snapshot=data
     if(revision===taskRevision&&!taskBusy&&!taskQueue.length){tasks=data.tasks||[];taskColor=data.taskColor||"#88c8ae"}
   }
@@ -224,12 +373,17 @@ Item {
   function expanded(value) { expandedCount = Math.max(0, expandedCount + (value ? 1 : -1)); if(value) refresh() }
 
   Timer { interval: root.expandedCount > 0 ? 8000 : 60000; running: root.pollingEnabled; repeat: true; triggeredOnStart: true; onTriggered: root.refresh() }
-  Timer { interval: 1000; running: root.remaining > 0 || root.expandedCount > 0; repeat: true; onTriggered: root.now = Date.now()/1000 }
+  Timer { interval: 1000; running: root.remaining > 0 || root.stopwatchStart > 0 || root.expandedCount > 0; repeat: true; onTriggered: root.updateClock() }
   Timer { id: feedbackTimer; interval: 7000; onTriggered: root.feedback = "" }
 
   ShellIpc {
     target: "bappoz.notch.service"
     function refresh(): void { root.refresh() }
+    function event(kind: string): string {
+      var routes = {report: "", transfer: "", call: "", attention: "agents/activity", done: "agents/activity"}
+      if (!Object.prototype.hasOwnProperty.call(routes, kind)) return "unsupported"
+      return root.enqueueNotice({kind: kind, tab: routes[kind]}) ? "queued" : "ignored"
+    }
     function status(): string { return JSON.stringify({loaded:true,busy:root.busy,players:root.players.length,files:root.shelf.length,agents:root.agents.length,systemBattery:root.systemBattery,lyricsState:root.lyricsState,lyricLines:root.lyrics.length}) }
   }
 }

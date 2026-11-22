@@ -13,3 +13,7 @@ CircleChoice 1.0 CircleChoice.qml
 AgentPet 1.0 AgentPet.qml
 WeatherScene 1.0 WeatherScene.qml
 MetricCard 1.0 MetricCard.qml
+IslandSignal 1.0 IslandSignal.qml
+IslandCompact 1.0 IslandCompact.qml
+CompactAgent 1.0 CompactAgent.qml
+IslandOrbit 1.0 IslandOrbit.qml

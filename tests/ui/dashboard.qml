@@ -59,6 +59,92 @@ ShellRoot {
             return "ok"
         }
         function enterSurface():void{var item=root.findObject("notch-live-surface");events.mouseMove(item,item.width/2,14)}
+        function openMediaMenu():string {
+            clickObject("quick-menu")
+            var result = clickObject("menu-home")
+            return result === "ok" ? notch.currentTab : result
+        }
+        function island():string {
+            var pill = root.findObject("notch-pill")
+            var surface = root.findObject("notch-live-surface")
+            return JSON.stringify({state:notch.islandState, width:pill.width, y:surface.parent.y, tab:notch.currentTab})
+        }
+        function timerState():string {
+            backend.updateClock()
+            backend.snapshot = Object.assign({},backend.snapshot,{timer:{end:backend.now+65}})
+            var initial = backend.islandClock
+            backend.now = Date.now()/1000 - 10
+            backend.snapshot = Object.assign({},backend.snapshot,{timer:{end:backend.now+1}})
+            backend.updateClock()
+            var finished = backend.currentNotice.kind
+            backend.snapshot = Object.assign({},backend.snapshot,{timer:{}})
+            backend.clearNotices()
+            backend.toggleStopwatch()
+            var stopwatch = backend.islandClock
+            backend.toggleStopwatch()
+            return JSON.stringify({initial:initial,finished:finished,stopwatch:stopwatch})
+        }
+        function activeMascots():string {
+            backend.telemetry = {sessions:[
+                {id:"claude-1",provider:"claude",working:true},
+                {id:"codex-1",provider:"codex",working:true},
+                {id:"claude-2",provider:"claude",working:true}
+            ]}
+            var clock = root.findObject("notch-clock")
+            var orbit = root.findObject("notch-orbit")
+            return JSON.stringify({
+                providers:backend.activeProviders,
+                clockCentered:Math.abs(clock.x + clock.width / 2 - clock.parent.width / 2) < 1,
+                orbit:orbit.running
+            })
+        }
+        function orbitPhase():real { return root.findObject("notch-orbit").phase }
+        function connectionStates():string {
+            backend.clearNotices()
+            backend.observeConnections({wifi:["existing"], headphones:["existing"]})
+            var baseline = backend.currentNotice.kind || ""
+            backend.observeConnections({wifi:["new"], headphones:["existing", "new"]})
+            var wifi = backend.currentNotice.kind
+            backend.dismissNotice()
+            backend.pumpNotices()
+            var headphones = backend.currentNotice.kind
+            backend.clearNotices()
+            backend.observeConnections({wifi:null, headphones:[]})
+            backend.observeConnections({wifi:["after-gap"], headphones:[]})
+            var recovered = backend.currentNotice.kind || ""
+            backend.clearNotices()
+            return JSON.stringify({baseline:baseline,wifi:wifi,headphones:headphones,recovered:recovered})
+        }
+        function media():string {
+            return backend.player ? backend.player.trackTitle + ":" + backend.player.isPlaying : ""
+        }
+        function simulateConnection(kind:string):void {
+            notch.close()
+            backend.clearNotices()
+            backend.enqueueNotice({kind:kind})
+        }
+        function simulateCall():void {
+            notch.close()
+            backend.clearNotices()
+            backend.noticeSeen=[]
+            backend.enqueueNotice({kind:"call",source:"Discord"})
+        }
+        function clear():void { notch.close(); backend.clearNotices() }
+        function islandEvents():string {
+            notch.close()
+            backend.clearNotices()
+            backend.noticeSeen=[]
+            backend.observeAgents([{id:"1",provider:"codex",working:true}])
+            var baseline=notch.islandState
+            backend.observeAgents([{id:"1",provider:"codex",working:false,activity:"completed"}])
+            var finished=backend.currentNotice.kind
+            backend.enqueueNotice({kind:"call",source:"Discord"})
+            var call=backend.currentNotice.kind
+            backend.dismissNotice()
+            var recent=notch.signalKind
+            backend.clearNotices()
+            return JSON.stringify({baseline:baseline,finished:finished,call:call,recent:recent})
+        }
         function click(tab:string):string{
             var item=root.findObject("tab-"+tab)
             if(!item)return "missing-tab-"+tab
@@ -73,7 +159,7 @@ ShellRoot {
         function open(tab:string):void{notch.held=true;notch.openTab(tab)}
         function captureStatus():void{root.oldTaskRevision=backend.taskRevision}
         function replayStatus():void{backend.applyStatus(Object.assign({},backend.snapshot,{tasks:[],taskColor:"#e59cae"}),root.oldTaskRevision)}
-        function clickObject(name:string):string{var item=root.findObject(name);if(!item)return "missing-"+name;events.mouseClick(item,item.width/2,item.height/2);return "ok"}
+        function clickObject(name:string):string{var item=root.findObject(name);if(!item)return "missing-"+name;events.mouseMove(item,item.width/2,item.height/2);events.mouseClick(item,item.width/2,item.height/2);return "ok"}
         function editTask():void{root.findObject("daily-page").expanded=backend.tasks[0].id}
         function emojiNote():int{var note=root.findObject("task-note-"+backend.tasks[0].id);note.text="z".repeat(1999)+"😀";return note.length}
         function longNote():int{var note=root.findObject("task-note-"+backend.tasks[0].id);note.text="z".repeat(2001);return note.length}

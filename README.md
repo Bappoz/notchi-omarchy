@@ -1,42 +1,28 @@
 # Notchi for Omarchy
 
-Ilha dinâmica nativa para o shell do Omarchy, inspirada em [OpenNotchi, de nannndev](https://github.com/nannndev/OpenNotchi). Adaptação independente para Linux/Wayland, em QML/Quickshell, sob licença MIT. A interface usa o código e as capturas oficiais como base para medidas, composição, vinil, calendário, navegação e nove perfis de animação. Logos de provedores vêm do repositório; os vetores Lucide vêm da mesma biblioteca da versão Windows. Os créditos e as licenças estão preservados. Third-party sources and licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Ilha dinâmica nativa para o shell do Omarchy, inspirada em [OpenNotchi, de nannndev](https://github.com/nannndev/OpenNotchi). Adaptação independente para Linux/Wayland, em QML/Quickshell, sob licença MIT. A superfície flutuante usa geometria e transições próprias em QML. As telas detalhadas mantêm a linhagem do OpenNotchi. Logos de provedores vêm do repositório; os vetores Lucide vêm da mesma biblioteca da versão Windows. Os créditos e as licenças estão preservados. Third-party sources and licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-![Notchi system dashboard](preview.png)
-
-Screenshots below are captured from the real Qt interface with synthetic demo data.
-
-| Daily tasks | Weather |
-| --- | --- |
-| ![Daily tasks](screenshots/daily.png) | ![Weather](screenshots/weather.png) |
-| AI details | System |
-| ![AI details](screenshots/agents-detail-codex.png) | ![System](screenshots/system.png) |
+![Notchi com os controles de mídia abertos](screenshots/island-media.png)
 
 ## Usar
 
-- Passe o mouse sobre a ilha no centro da barra para abrir.
-- **Super + Alt + N** abre ou fecha no monitor em foco. **Esc** fecha.
-- O alfinete mantém o painel aberto; clicar fora fecha quando ele está fixado.
-- **Ctrl + 1 … 8** troca as seções; as seções principais aparecem no topo.
-- A roda do mouse sobre a ilha ajusta o volume.
-- O menu **…** abre calendário, controles e ajustes. Nos ajustes, escolha o tema e uma das nove animações.
-
-O Notch de IA anterior permanece ativo. Codex usa o nó verde GPT da referência e Claude usa o Clawd laranja. Os modelos 2D nativos usam somente olhos, sem boca ou sobrancelhas. Teclado com digitação, balão de pensamento, óculos/livro e lupa distinguem os estados. A geometria do nó deriva da referência; acessórios e movimentos foram implementados em QML. Desativar animações mantém uma pose estática. Arte comunitária de [Mascot for Agents](https://github.com/SaiTejaVoonna/mascot-for-agents), com licença/créditos incluídos.
-
-Um novo período de trabalho detectado em Claude/Codex mostra um aviso discreto por cinco segundos na tela em foco, sem mover o foco ou abrir o painel inteiro. Clicar no aviso abre IA → Sessões. O painel novo lê os registros existentes de agentes do Omarchy, sem iniciar outra sessão de agente ou gerar cobranças de IA.
+- Passe o mouse sobre a cápsula no topo para abrir os controles rápidos. Um clique ou **Super + Alt + N** abre no monitor em foco e fixa a ilha. **Esc** fecha.
+- A roda do mouse sobre a cápsula ajusta o volume. Quando a barra fica no topo, a cápsula ocupa o centro junto à borda, com 8 px de respiro.
+- O menu **…** leva às telas completas e aos ajustes. As telas detalhadas têm navegação própria e **Ctrl + 1 … 8** mantém os atalhos das seções.
+- Ative **Ajustes → Aparência → Alertas do desktop** para chamadas, notificações e transferências. Para exemplos sem contas reais e a matriz de validação, veja [Ilha flutuante](docs/FLOATING_ISLAND.md).
 
 ## O que está incluído
 
 | Área | Disponível nesta versão |
 | --- | --- |
-| Aparência | Medidas e contorno do OpenNotchi, nove animações (seis 2D e três 3D), vidro com blur do Hyprland, preto e fosco; respeita as animações desligadas no Omarchy |
+| Aparência | Cápsula centralizada, três aparências e nove perfis de abertura (seis 2D e três 3D). Respeita as animações desligadas no Omarchy |
 | Monitores | Uma ilha em cada tela; atalho abre no monitor em foco |
 | Mídia | Fontes MPRIS, capa, vinil giratório, reproduzir/pausar, anterior/próxima, seek, shuffle/repeat quando o player expõe esses controles; volume e mute |
 | Vídeo | Prévia ao vivo de uma janela escolhida; algumas janelas minimizadas não fornecem imagens ao compositor |
 | Letras | Abrir Letras inicia a consulta ao LRCLIB; envia artista, título, álbum e duração. Trocas de faixa atualizam a letra somente enquanto a tela está aberta. Aceita letras sem sincronia e arquivos LRC |
 | Agenda | Calendário, relógios de São Paulo/Londres/Dubai/Tóquio/Los Angeles, acesso ao calendário completo e ao globo originais |
 | Reuniões | Acesso ao plugin existente de próximos eventos; o feed e sua configuração são preservados |
-| Foco | Presets, duração e mensagem personalizadas; alerta entregue pelo systemd mesmo com o painel fechado ou recarregado |
+| Foco | Cronômetro na sessão do shell, timer com presets, duração e mensagem personalizadas; alerta entregue pelo systemd mesmo com o painel fechado ou recarregado |
 | Arquivos | Soltar arquivos ou escolher pela janela de seleção; abrir, revelar, arrastar para fora, remover referência, OCR e conversão PNG/JPEG/WebP |
 | Clipboard | Histórico já existente do Omarchy, busca e cópia de texto/imagens; sem instalar outro capturador de clipboard |
 | Câmera | Prévia iniciada por botão, 18 estilos e quatro opções de moldura com seletores circulares e prévia ao vivo, fotos e desenho livre; originais preservados. Fecha o painel para desligar |
@@ -57,7 +43,7 @@ As tarefas ficam somente neste computador, em `~/.local/state/omarchy-notch/stat
 
 Clique num provedor em IA para ver os contadores locais e gráficos de 7/30 dias. Os coletores podem fornecer apenas parte desse histórico. Campos ausentes permanecem desconhecidos, e os totais por modelo cobrem todo o histórico disponível, sem equivaler à cota da assinatura nem a uma fatura.
 
-A aba Clima reutiliza a localização configurada no Omarchy ou nas integrações. O botão de localização abre o painel original. A consulta ocorre a cada dez minutos, com verificação local da sessão a cada minuto. O primeiro carregamento, retomadas, sessão bloqueada/inativa e troca de localização não geram avisos atrasados. Chuva, tempestade, neve e umidade ≤25% avisam na mudança de condição; temperatura avisa para variação ≥3°C, com intervalo mínimo de 45 minutos. São avisos de condições previstas pelo Open-Meteo, não alertas oficiais de defesa civil. Cada aviso dura cinco segundos, não interrompe outro aviso nem um painel aberto, e expira se não puder ser exibido logo.
+A aba Clima reutiliza a localização configurada no Omarchy ou nas integrações. O botão de localização abre o painel original. A consulta ocorre a cada dez minutos, com verificação local da sessão a cada minuto. O carregamento inicial e as trocas de localização estabelecem uma nova referência. A fila expira ao suspender ou quando a sessão fica indisponível. Chuva, tempestade, neve e umidade ≤25% avisam na mudança de condição; temperatura avisa para variação ≥3°C, com intervalo mínimo de 45 minutos. São avisos de condições previstas pelo Open-Meteo, não alertas oficiais de defesa civil. Cada aviso dura cerca de cinco segundos. Avisos de clima aguardam a fila e expiram se o painel permanecer aberto.
 
 ## Atividade e privacidade
 

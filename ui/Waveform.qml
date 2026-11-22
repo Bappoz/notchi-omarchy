@@ -9,12 +9,17 @@ Item {
     property color color: "white"
     property int barCount: 5
     property real maximumHeight: height
+    property real energy: playing ? 1 : 0
+
+    Behavior on energy {
+        NumberAnimation { duration: root.motionEnabled ? 190 : 0; easing.type: Easing.OutCubic }
+    }
 
     implicitWidth: 26
     implicitHeight: 20
 
     FrameAnimation {
-        running: root.visible && root.playing && root.motionEnabled
+        running: root.visible && root.energy > 0 && root.motionEnabled
         onTriggered: root.phase += frameTime
     }
 
@@ -39,9 +44,10 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 3
                     radius: 2
-                    height: root.playing ? Math.max(4, root.maximumHeight * (0.35 + 0.65 * Math.abs(Math.sin(root.phase * (3 + index * 0.7) + index * 1.3)))) : 4
+                    height: 4 + root.energy * (Math.max(4, root.maximumHeight *
+                        (0.38 + 0.62 * Math.abs(Math.sin(root.phase * (3 + index * 0.7) + index * 1.3)))) - 4)
                     color: root.color
-                    opacity: root.playing ? 0.9 : 0.35
+                    opacity: 0.35 + root.energy * .55
                 }
 
             }

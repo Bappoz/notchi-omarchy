@@ -2,7 +2,7 @@
 
 // OpenNotchi macOS NotchAnimationStyle.swift + Windows styles.css, MIT.
 var profiles = {
-  fluid: {duration:380, curve:[0.32,1.25,0.45,1,1,1], scale:0.92, offset:-6, blur:4},
+  fluid: {duration:340, curve:[0.22,1.04,0.36,1,1,1], scale:0.98, offset:-5, blur:0},
   bouncy: {duration:480, curve:[0.34,1.85,0.55,1,1,1], scale:0.72, offset:-20, blur:6},
   waterfall: {duration:460, curve:[0.22,1.28,0.36,1,1,1], scale:0.96, offset:-68, blur:6},
   snappy: {duration:140, curve:[0.16,1,0.3,1,1,1], scale:1, offset:0, blur:0},

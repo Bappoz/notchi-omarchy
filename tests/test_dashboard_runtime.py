@@ -65,6 +65,7 @@ class DashboardRuntimeTests(unittest.TestCase):
                     stderr=log,
                     env=env,
                 )
+                fixture = None
                 try:
                     end = time.monotonic() + 8
                     while True:
@@ -87,6 +88,52 @@ class DashboardRuntimeTests(unittest.TestCase):
                         if time.monotonic() > end or process.poll() is not None:
                             self.fail((folder / "log").read_text())
                         time.sleep(0.1)
+                    initial = json.loads(ipc("island"))
+                    self.assertEqual(initial["state"], "idle")
+                    self.assertEqual(initial["y"], 8)
+                    self.assertLess(initial["width"], 220)
+                    self.assertEqual(json.loads(ipc("islandEvents")), {
+                        "baseline": "idle", "finished": "done", "call": "call", "recent": "call"
+                    })
+                    self.assertEqual(json.loads(ipc("timerState")), {
+                        "initial": "1:05", "finished": "timer", "stopwatch": "0:00"
+                    })
+                    self.assertEqual(json.loads(ipc("connectionStates")), {
+                        "baseline": "", "wifi": "wifi", "headphones": "headphones", "recovered": ""
+                    })
+                    capture = os.environ.get("NOTCHI_CAPTURE_DIR")
+                    destination = Path(capture) if capture else None
+                    if destination:
+                        destination.mkdir(parents=True, exist_ok=True)
+
+                    def save(name):
+                        if not destination:
+                            return
+                        path = destination / (name + ".png")
+                        path.unlink(missing_ok=True)
+                        ipc("save", str(path))
+                        end = time.monotonic() + 3
+                        while not path.exists():
+                            self.assertLess(time.monotonic(), end, name)
+                            time.sleep(0.05)
+
+                    ipc("prepare", "fluid")
+                    time.sleep(0.4)
+                    save("island-idle")
+                    self.assertEqual(json.loads(ipc("activeMascots")), {
+                        "providers": ["claude", "codex"], "clockCentered": True, "orbit": True
+                    })
+                    phase = float(ipc("orbitPhase"))
+                    time.sleep(0.25)
+                    self.assertNotEqual(float(ipc("orbitPhase")), phase)
+                    save("island-agents")
+                    for kind in ("wifi", "headphones"):
+                        ipc("simulateConnection", kind)
+                        time.sleep(0.4)
+                        self.assertEqual(json.loads(ipc("island"))["state"], "alert")
+                        save("island-" + kind)
+                    ipc("clear")
+                    ipc("prepare", "fluid")
                     for style in os.environ.get(
                         "NOTCHI_STYLES",
                         "fluid,bouncy,waterfall,snappy,pop,gentle,flip3D,depth3D,cube3D",
@@ -100,6 +147,9 @@ class DashboardRuntimeTests(unittest.TestCase):
                         )
                         ipc("enterSurface")
                         time.sleep(0.8)
+                        self.assertEqual(json.loads(ipc("island"))["tab"], "quick")
+                        self.assertEqual(ipc("openMediaMenu"), "home", style)
+                        time.sleep(0.4)
                         for tab in ["system", "daily", "weather", "agents"]:
                             self.assertEqual(
                                 ipc("click", tab), tab, style + " click " + tab
@@ -243,26 +293,40 @@ class DashboardRuntimeTests(unittest.TestCase):
                     ipc("open", "system")
                     time.sleep(0.1)
                     self.assertEqual(json.loads(ipc("info"))["progress"], 1)
-                    capture = os.environ.get("NOTCHI_CAPTURE_DIR")
-                    if capture:
-                        destination = Path(capture)
-                        destination.mkdir(parents=True, exist_ok=True)
-                        for page in [
-                            "daily",
-                            "system",
-                            "weather",
-                            "agents/detail-codex",
-                        ]:
-                            ipc("open", page)
-                            time.sleep(0.5)
-                            path = destination / (page.replace("/", "-") + ".png")
-                            ipc("save", str(path))
-                            end = time.monotonic() + 3
-                            while not path.exists():
-                                self.assertLess(time.monotonic(), end)
-                                time.sleep(0.05)
+                    ipc("simulateCall")
+                    time.sleep(0.55)
+                    self.assertEqual(json.loads(ipc("island"))["state"], "alert")
+                    save("island-alert")
+                    ipc("clear")
+                    # The fake player owns a synthetic name on the disposable bus.
+                    self.assertEqual(ipc("media"), "")
+                    fixture = subprocess.Popen(
+                        ["/usr/bin/python3", str(ROOT / "tests/island_mpris_fixture.py")],
+                        stdout=log,
+                        stderr=log,
+                    )
+
+                    def wait_media(expected):
+                        end = time.monotonic() + 5
+                        while ipc("media") != expected:
+                            self.assertLess(time.monotonic(), end, expected)
+                            time.sleep(0.1)
+
+                    wait_media("Night Transit:true")
+                    self.assertEqual(json.loads(ipc("island"))["state"], "compact")
+                    save("island-playing")
+                    ipc("open", "quick")
+                    time.sleep(0.5)
+                    save("island-media")
+                    self.assertEqual(ipc("clickObject", "quick-play-pause"), "ok")
+                    wait_media("Night Transit:false")
+                    self.assertEqual(ipc("clickObject", "quick-play-pause"), "ok")
+                    wait_media("Night Transit:true")
 
                 finally:
+                    if fixture:
+                        fixture.terminate()
+                        fixture.wait(timeout=3)
                     subprocess.run(
                         ["quickshell", "kill", "--path", str(folder / "shell.qml")],
                         capture_output=True,

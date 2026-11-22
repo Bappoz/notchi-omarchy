@@ -13,15 +13,18 @@ Item {
     property bool recorderStarted: false
     property string appName: ""
     property var guide: null
+    property int guideGeneration: 0
 
     function toggle() {
         if (!service.sessionAvailable) return
         if (phase === "listening" || phase === "preparing") {
             phase = "processing"
             if (recorderStarted) recorder.write("stop\n")
+        } else if (phase === "processing") {
+            cancel()
         } else if (!recorder.running) {
             feedback.stop()
-            guide = null
+            clearGuide()
             level = 0
             recorderStarted = false
             phase = "preparing"
@@ -29,12 +32,18 @@ Item {
         }
     }
 
+    function clearGuide() {
+        guideGeneration++
+        finder.pending = []
+        if (finder.running) finder.running = false
+        guide = null
+    }
+
     function cancel() {
         if (recorder.running) recorder.signal(15)
-        if (finder.running) finder.running = false
         feedback.stop()
         phase = ""
-        guide = null
+        clearGuide()
     }
 
     function finish(next) {
@@ -51,10 +60,9 @@ Item {
             appName = result.app.name
             result.app.execute()
             finish("opening")
-            if (!finder.running) {
-                finder.command = ["/usr/bin/python3", adapter, "guide"].concat(Commands.windowClasses(result.app))
-                finder.running = true
-            }
+            finder.pending = ["/usr/bin/python3", adapter, "guide"].concat(Commands.windowClasses(result.app))
+            if (finder.running) finder.running = false
+            else finder.startPending()
             return
         }
         if (result.action === "tab") {
@@ -107,9 +115,21 @@ Item {
 
     Process {
         id: finder
+        property var pending: []
+        property int generation: 0
+
+        function startPending() {
+            if (running || !pending.length || root.phase !== "opening") return
+            generation = root.guideGeneration
+            command = pending
+            pending = []
+            running = true
+        }
+
+        onExited: Qt.callLater(startPending)
         stdout: SplitParser {
             onRead: function(line) {
-                if (!root.service.sessionAvailable || root.phase !== "opening") return
+                if (!root.service.sessionAvailable || root.phase !== "opening" || finder.generation !== root.guideGeneration) return
                 try { root.guide = JSON.parse(line) } catch (error) { return }
                 feedback.restart()
             }

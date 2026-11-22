@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 class VoiceAdapterTests(unittest.TestCase):
@@ -75,3 +76,13 @@ else:
         from voice import transcription_event
         self.assertEqual(transcription_event({"error": "Cannot read cloud audio"}), {"error": "audioUnreadable"})
         self.assertEqual(transcription_event({"error": "No speech detected"}), {"error": "empty"})
+
+    def test_does_not_guess_which_session_to_execute(self):
+        from voice import transcribe
+
+        for reply in ({"ok": True}, {"ok": True, "session_id": 4}):
+            with self.subTest(reply=reply), patch("voice.superwhisper", side_effect=[
+                {"phase": "idle", "session_id": 4}, reply,
+            ]) as cli:
+                self.assertEqual(transcribe(Path("/test/command.wav")), {"error": "unavailable"})
+                self.assertEqual(cli.call_count, 2)

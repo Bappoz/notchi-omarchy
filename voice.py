@@ -100,10 +100,8 @@ def transcribe(path):
     # file. Keep the WAV open to the daemon until its own session completes.
     previous = before.get("session_id")
     session = reply.get("session_id")
-    if type(session) is not int or session == previous:
-        if type(previous) is not int:
-            return {"error": "unavailable"}
-        session = previous + 1
+    if type(session) is not int or type(previous) is not int or session <= previous:
+        return {"error": "unavailable"}
 
     deadline = time.monotonic() + TRANSCRIBE_TIMEOUT
     while time.monotonic() < deadline:

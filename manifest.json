@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "bappoz.notch",
   "name": "Notchi for Omarchy",
-  "version": "0.6.3",
+  "version": "0.7.0",
   "author": "Bappoz; inspired by nannndev/OpenNotchi",
   "license": "MIT",
   "description": "A native dynamic island for Omarchy with media, calendar, files, focus and agents.",

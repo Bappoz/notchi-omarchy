@@ -81,6 +81,36 @@ BarWidget {
     readonly property bool hoverEnabled: !model || model.preferences.hover !== "false"
     readonly property var islandScreen: root.QsWindow.window ? root.QsWindow.window.screen : null
     readonly property string screenName: islandScreen ? islandScreen.name : ""
+    property int fullscreenRevision: 0
+    readonly property bool fullscreen: {
+        var revision = fullscreenRevision;
+        var monitor = islandScreen ? Hyprland.monitorFor(islandScreen) : null;
+        var workspace = monitor ? monitor.activeWorkspace : null;
+        if (!workspace) return false;
+        var windows = Hyprland.toplevels.values;
+        for (var i = 0; i < windows.length; i++) {
+            var window = windows[i];
+            if (window.workspace && window.workspace.id === workspace.id
+                    && window.lastIpcObject && (Number(window.lastIpcObject.fullscreen) & 2))
+                return true;
+        }
+        return false;
+    }
+    onFullscreenChanged: if (fullscreen) close()
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            if (event && ["fullscreen", "openwindow", "closewindow", "movewindowv2",
+                          "workspacev2", "focusedmonv2"].includes(String(event.name)))
+                fullscreenRefresh.restart();
+        }
+    }
+    Timer {
+        id: fullscreenRefresh
+        interval: 80
+        onTriggered: { Hyprland.refreshToplevels(); fullscreenSettle.restart(); }
+    }
+    Timer { id: fullscreenSettle; interval: 250; onTriggered: root.fullscreenRevision++ }
     readonly property bool focusedScreen: !Hyprland.focusedMonitor || Hyprland.focusedMonitor.name === screenName
     readonly property string compactTime: clock.date.toLocaleTimeString(Qt.locale(I18n.formatLocale), "HH:mm")
     readonly property string compactDate: clock.date.toLocaleDateString(Qt.locale(I18n.formatLocale), "ddd d")
@@ -130,7 +160,7 @@ BarWidget {
     }
 
     function open() {
-        if (opened)
+        if (opened || fullscreen)
             return ;
 
         if (bar && bar.requestPopout)
@@ -255,7 +285,7 @@ BarWidget {
                 ? root.bar.moduleWidgets(root.moduleName) : [root];
             return JSON.stringify({
                 opened: root.opened, tab: root.currentTab, screen: root.screenName,
-                state: root.islandState, activityPeek: root.activityPeek, service: !!root.model, pageReady: root.pageReady, pageError: root.pageError,
+                state: root.islandState, fullscreen: root.fullscreen, activityPeek: root.activityPeek, service: !!root.model, pageReady: root.pageReady, pageError: root.pageError,
                 pageMode: page.item && "mode" in page.item ? page.item.mode : "",
                 pageHasModel: !!page.item && !!page.item.model,
                 animation: root.animationStyle, y: card.y, width: card.width, height: card.height,
@@ -348,7 +378,7 @@ BarWidget {
         id: window
 
         screen: root.islandScreen
-        visible: !!root.islandScreen
+        visible: !!root.islandScreen && !root.fullscreen
         color: "transparent"
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.namespace: "bappoz-notch"

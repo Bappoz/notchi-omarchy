@@ -6,7 +6,7 @@ import "Plugin" as Plugin
 ShellRoot {
     id:root
     Plugin.Service{id:backend;pollingEnabled:false}
-    Plugin.DesktopOsd{id:desktopOsd;service:backend}
+    Plugin.DesktopOsd{id:desktopOsd}
     QtObject{id:fakeShell;function serviceFor(id){return backend}}
     QtObject {
         id:fakeBar

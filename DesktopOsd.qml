@@ -4,11 +4,13 @@ import Quickshell.Wayland
 import Quickshell.Hyprland
 import qs.Commons
 import qs.Commons as Commons
+import "." as Local
 
 // Omarchy sends both native shortcut events and command-line OSDs here.
 Item {
     id: root
     property var service: null
+    readonly property var model: service || Local.Runtime.model
     property bool opened: false
     property string glyph: ""
     property string message: ""
@@ -39,9 +41,9 @@ Item {
         var progress = data.value !== undefined && data.value !== null && data.value !== "" && Number.isFinite(Number(data.value))
         var maximum = Math.max(1, Number(data.max) || 100)
         var percent = progress ? Math.max(0, Math.min(100, Math.round(Number(data.value) * 100 / maximum))) : 0
-        if (volume && progress && service) {
-            service.lastOsdVolumeAt = Date.now()
-            service.showVolume(percent, muted, true)
+        if (volume && progress && model) {
+            model.lastOsdVolumeAt = Date.now()
+            model.showVolume(percent, muted, true)
             return
         }
         fraction = progress && !data.message ? percent / 100 : -1
@@ -57,14 +59,14 @@ Item {
     function close() {
         opened = false
         hideTimer.stop()
-        if (service) service.volumeHudActive = false
+        if (model) model.volumeHudActive = false
     }
 
     ShellIpc {
         target: "osd"
         function show(payload: string): string { root.open(payload); return "ok" }
         function close(): string { root.close(); return "ok" }
-        function state(): string { return root.opened || (root.service && root.service.volumeHudActive) ? "open" : "closed" }
+        function state(): string { return root.opened || (root.model && root.model.volumeHudActive) ? "open" : "closed" }
         function ping(): string { return "ok" }
     }
 

@@ -8,10 +8,10 @@ transformam uma captura da superfície visual. O plano de entrada permanece fixo
 
 | Estado | Comportamento | Como conferir |
 | --- | --- | --- |
-| Repouso | Hora e dia, com a cápsula no topo | Feche a ilha e pause o player. Após o último sinal expirar, sobra o relógio |
+| Repouso | Hora no centro da cápsula e calendário discreto à esquerda quando não há mascotes ativos | Feche a ilha e pause o player. Após o último sinal expirar, sobra o relógio |
 | Compacto | Onda de mídia, mascotes dos provedores ativos, contador de tempo ou último sinal | Toque uma faixa MPRIS, observe um agente executando e inicie um timer em Foco. Mídia e mascotes podem aparecer juntos, com o relógio no centro |
 | Alerta | Texto curto, ícone em movimento e retorno automático | Envie os eventos de teste abaixo. Chamadas podem antecipar outro aviso. Depois da transição, o ícone mais recente pode ficar visível por até cinco minutos |
-| Expandido | Título, artista e transporte MPRIS, atalhos de Foco, Tarefas e Agentes, mais o cronômetro | Passe o mouse e saia da cápsula. Clique para fixar, navegue pelo menu e feche com Esc ou clique fora |
+| Expandido | Título, artista e controles MPRIS, cronômetro e dock inferior | Passe o mouse e saia da cápsula. Clique para fixar, navegue pelo dock e feche com Esc ou clique fora |
 
 **Ajustes → Aparência** mantém os nove perfis de abertura. `Fluid Classic` é o
 perfil padrão. Desative **Animações** para conferir que a geometria, o sino,
@@ -43,12 +43,29 @@ a entrega por systemd.
   notificação. A cobertura varia com o cliente e com sua configuração de
   notificações. Atender chamadas, aceitar transferências e exibir progresso
   dependem do aplicativo de origem.
-- **Wi‑Fi e fones Bluetooth.** Notifica novas conexões confirmadas pelo
-  NetworkManager e por dispositivos de áudio conectados no BlueZ. O primeiro
-  estado observado é a referência. Os avisos mostram um ícone à esquerda e um
-  aro de confirmação à direita. Os nomes das redes e dos dispositivos ficam
-  fora da ilha. A verificação ocorre a cada três segundos, com fallback
-  silencioso quando a fonte está indisponível.
+- **Volume.** O painel de OSD recebe as teclas e os controles do Omarchy.
+  Alterações externas também são observadas no sink padrão do PipeWire. O
+  primeiro valor estabelece uma referência. Brilho e avisos do sistema
+  continuam aparecendo na parte inferior.
+- **Câmera.** A luz verde acompanha fontes V4L2/libcamera ativas no PipeWire
+  e processos do usuário com descritores V4L2 abertos. O plugin lê apenas
+  metadados. O uso direto de V4L2 é uma aproximação, pois um programa pode
+  manter o dispositivo aberto sem captar imagens.
+- **Bateria.** O UPower informa a conexão à energia, a passagem para 20% e a
+  conclusão da carga. Uma amostra inicial já carregada ou descarregada serve
+  de referência.
+- **Wi‑Fi e Bluetooth.** A consulta usa NetworkManager e BlueZ a cada três
+  segundos. A ilha mostra o nome local do dispositivo Bluetooth e o nível
+  da bateria se o BlueZ o publicar. No BlueZ padrão, o nível disponível é
+  agregado. Esquerda, direita e estojo dependem do fabricante e do driver.
+- **Voz.** O atalho grava até 12 segundos e mede a intensidade do áudio para
+  animar as barras. A gravação temporária vai para a CLI do Superwhisper sem
+  inserção de texto no aplicativo ativo. O arquivo fica disponível até a
+  sessão de transcrição terminar e depois é removido. O modo escolhido no Superwhisper
+  determina se o áudio é processado localmente ou na nuvem. O Cursor Buddy
+  é um indicador visual e acompanha a janela identificada pelo Hyprland.
+  Aplicativos com um identificador de janela diferente do arquivo .desktop
+  podem abrir sem o cursor animado.
 - **Builds, deploys e scripts.** Use o IPC local com um tipo fixo. A resposta
   `queued` indica aceitação para a fila. `ignored` indica sessão
   indisponível ou evento repetido.
@@ -88,7 +105,10 @@ NOTCHI_UI_TESTS=1 dbus-run-session -- python -m unittest discover -s tests
 Execute a última linha em um perfil Wayland descartável. O teste de interface
 usa um player MPRIS sintético e a variável `NOTCHI_CAPTURE_DIR` para capturas.
 Ele percorre os nove perfis, saída por hover, navegação fixada, retorno de
-detalhes de provedor, movimento reduzido e reprodução/pausa.
+detalhes de provedor, movimento reduzido e reprodução/pausa. Também exercita
+o mini calendário, os atalhos em Ajustes, as mensagens de OSD, eventos de hardware simulados e um comando de voz que
+abre o calendário, sem usar microfone nem serviços externos. As capturas
+`hardware-*.png` e `updated-*.png` mostram os cenários novos.
 
 As imagens abaixo são capturas do QML com dados sintéticos. [Claude e Codex em atividade](../screenshots/island-agents.png) · [Wi-Fi conectado](../screenshots/island-wifi.png) · [Fones conectados](../screenshots/island-headphones.png).
 

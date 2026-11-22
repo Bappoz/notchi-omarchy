@@ -13,6 +13,7 @@ OpenNotchi Windows app: https://github.com/lucide-icons/lucide
 Revision: 53fab88ff9d1b48f4704b5b5b560d6b4d560bf4c. White stroke and local aliases
 are adaptations. ISC and Feather MIT notices are in assets/icons/LICENSE.
 Filled playback controls/captions use simple locally reconstructed geometry.
+The speaker, microphone, cursor buddy and two-tone emblem glyphs use locally drawn geometry.
 Apple SF Symbols are not bundled.
 
 Inter Variable is bundled from https://github.com/rsms/inter under the

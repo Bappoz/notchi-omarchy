@@ -2,13 +2,18 @@
 
 Ilha dinâmica nativa para o shell do Omarchy, inspirada em [OpenNotchi, de nannndev](https://github.com/nannndev/OpenNotchi). Adaptação independente para Linux/Wayland, em QML/Quickshell, sob licença MIT. A superfície flutuante usa geometria e transições próprias em QML. As telas detalhadas mantêm a linhagem do OpenNotchi. Logos de provedores vêm do repositório; os vetores Lucide vêm da mesma biblioteca da versão Windows. Os créditos e as licenças estão preservados. Third-party sources and licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
+[Versão 0.7.0](https://github.com/Bappoz/notchi-omarchy/releases/tag/v0.7.0) · [Instalação e atualização](#instalar-e-atualizar) · [Histórico de versões](CHANGELOG.md)
+
 ![Notchi com os controles de mídia abertos](screenshots/island-media.png)
 
 ## Usar
 
-- Passe o mouse sobre a cápsula no topo para abrir os controles rápidos. Um clique ou **Super + Alt + N** abre no monitor em foco e fixa a ilha. **Esc** fecha.
+- Passe o mouse sobre a cápsula no topo para abrir a ilha com os atalhos na parte inferior. Um clique abre e fixa a ilha no monitor em foco. Se configurado, **Super + Alt + N** também abre a ilha. **Esc** fecha.
 - A roda do mouse sobre a cápsula ajusta o volume. Quando a barra fica no topo, a cápsula ocupa o centro junto à borda, com 8 px de respiro.
-- O menu **…** leva às telas completas e aos ajustes. As telas detalhadas têm navegação própria e **Ctrl + 1 … 8** mantém os atalhos das seções.
+- Clique no calendário discreto à esquerda da hora para abrir o mês, com um ponto no dia de hoje.
+- A engrenagem reúne aparência, integrações, atalhos e controles. Clique nela de novo para voltar à página anterior. **Ctrl + 1 … 8** mantém os atalhos das seções.
+- As teclas de volume e a roda do mouse mostram o nível na ilha. A câmera em uso mantém um sinal verde. A ilha também avisa sobre conexão Bluetooth, início de carga, bateria a 20% ou menos e carga completa.
+- O microfone no dock ou **Super + Alt + V**, se configurado, inicia um comando de voz. Espere aparecer **Ouvindo…**, fale e acione o mesmo controle para enviar.
 - Ative **Ajustes → Aparência → Alertas do desktop** para chamadas, notificações e transferências. Para exemplos sem contas reais e a matriz de validação, veja [Ilha flutuante](docs/FLOATING_ISLAND.md).
 
 ## O que está incluído
@@ -20,14 +25,16 @@ Ilha dinâmica nativa para o shell do Omarchy, inspirada em [OpenNotchi, de nann
 | Mídia | Fontes MPRIS, capa, vinil giratório, reproduzir/pausar, anterior/próxima, seek, shuffle/repeat quando o player expõe esses controles; volume e mute |
 | Vídeo | Prévia ao vivo de uma janela escolhida; algumas janelas minimizadas não fornecem imagens ao compositor |
 | Letras | Abrir Letras inicia a consulta ao LRCLIB; envia artista, título, álbum e duração. Trocas de faixa atualizam a letra somente enquanto a tela está aberta. Aceita letras sem sincronia e arquivos LRC |
-| Agenda | Calendário, relógios de São Paulo/Londres/Dubai/Tóquio/Los Angeles, acesso ao calendário completo e ao globo originais |
+| Agenda | Hora centralizada, mini calendário na cápsula, relógios de São Paulo/Londres/Dubai/Tóquio/Los Angeles, acesso ao calendário completo e ao globo originais |
 | Reuniões | Acesso ao plugin existente de próximos eventos; o feed e sua configuração são preservados |
 | Foco | Cronômetro na sessão do shell, timer com presets, duração e mensagem personalizadas; alerta entregue pelo systemd mesmo com o painel fechado ou recarregado |
 | Arquivos | Soltar arquivos ou escolher pela janela de seleção; abrir, revelar, arrastar para fora, remover referência, OCR e conversão PNG/JPEG/WebP |
 | Clipboard | Histórico já existente do Omarchy, busca e cópia de texto/imagens; sem instalar outro capturador de clipboard |
 | Câmera | Prévia iniciada por botão, 18 estilos e quatro opções de moldura com seletores circulares e prévia ao vivo, fotos e desenho livre; originais preservados. Fecha o painel para desligar |
 | Agentes | Cartões clicáveis com tokens de hoje, histórico diário e modelos quando reportados; cotas de uso consumido, atualizadas pelos coletores nativos a cada cinco minutos, horário/estado da leitura e atualização manual. Sessões Claude/Codex com atividade, projeto, workspace identificado, tokens e contexto quando reportados |
-| Sistema | Aba ao lado de IA, com CPU, memória, disco, tráfego de rede com histórico e bateria do notebook |
+| HUDs | Volume e mudo na ilha, indicação de câmera em uso e avisos para Bluetooth, começo da carga, bateria baixa e carga concluída |
+| Voz | Superwhisper para Linux, medidor do microfone e Cursor Buddy para apontar para janelas reconhecidas pelo Hyprland |
+| Sistema | CPU, memória, disco, tráfego de rede com histórico e bateria do notebook |
 | Controles locais | CPU, memória, baterias que o kernel expõe, saídas de áudio, portas TCP, encerramento confirmado de processo próprio, seletor de cor, brilho, captura de texto |
 | Omarchy | Gravação/parada, lembretes, luz noturna, não perturbe, manter acordado, teclado, atualizações, Bluetooth e acesso administrativo temporário pelos comandos originais |
 | Clima | Cena animada, temperatura e sensação, umidade, vento e previsão por hora via Open-Meteo; avisos breves por mudança observada, compartilhando a fila dos agentes |
@@ -53,17 +60,16 @@ Tokens são o consumo reportado do turno/sessão, não um cálculo de custo. Con
 
 ## Recursos que ainda não têm equivalência completa
 
-Esta é a versão **0.6.0**. A interface foi reconstruída a partir da referência; as APIs específicas de cada sistema continuam tendo as diferenças abaixo.
+A interface foi adaptada para Qt e Hyprland. Alguns recursos dependem do que o Linux, o dispositivo ou o aplicativo expõem.
 
-- O compartilhamento prepara o arquivo no **LocalSend** já instalado, onde você escolhe o destinatário. Não implementa o protocolo Apple AirDrop. A referência antiga a OmDrop na configuração deste computador não corresponde a um plugin instalado.
-- Não há haptics de hardware, gestos de mão por visão computacional, segmentação de retrato ou leitura proprietária de bateria esquerda/direita/estojo de AirPods. Baterias expostas pelo Linux aparecem no painel.
+- O compartilhamento usa o **LocalSend** quando instalado. O Omdrop pode gerar um aviso de transferência separado.
+- O BlueZ informa a bateria de alguns dispositivos Bluetooth. No BlueZ padrão o nível é agregado, inclusive para fones cujo aplicativo próprio mostra porcentagens por lado e estojo.
 - Os nove perfis foram adaptados para Qt, incluindo transformação em perspectiva, blur e escurecimento nos três efeitos 3D. A refração nativa de Liquid Glass do macOS não está disponível no Hyprland; vidro usa transparência, contorno e blur do compositor.
 - Letras usam timestamps, foco/rolagem por linha e blur nas linhas distantes; o alinhamento depende dos dados LRC recebidos.
 - Os estilos têm prévia em GPU e exportação não destrutiva. O processamento da foto em resolução completa pode produzir pequenas diferenças em relação à prévia. O editor oferece três decorações e desenho, sem todo o catálogo de adesivos do projeto original.
 - Favoritar faixas e controle remoto completo do Spotify ficam no cliente original; o conector desta versão transfere reprodução entre dispositivos. Tokens inseridos manualmente precisam ser renovados quando expirarem.
 - OCR de PDF usa **a primeira página**. Para documentos maiores, use o aplicativo de OCR/PDF de sua preferência.
 - Os relógios usam um conjunto inicial de cidades. A edição visual das cidades continua disponível no globo original.
-- Updates are distributed through this Git repository and the Omarchy plugin manager.
 
 Os conectores autenticados foram validados com testes isolados, **sem conexão à conta/dispositivos do usuário**, pois nenhuma credencial foi fornecida. A câmera foi carregada com captura desligada; a captura real depende do dispositivo e de sua permissão.
 
@@ -71,25 +77,63 @@ Os conectores autenticados foram validados com testes isolados, **sem conexão �
 
 Abra **Ajustes → Conectar integrações**. Preencha somente os serviços que deseja usar. Os campos de chave vazios preservam chaves já salvas; nenhuma chave salva é devolvida à interface. Elas ficam em um arquivo privado deste computador, com permissão de leitura/escrita apenas para seu usuário.
 
-Em **Controles → Clima, mercados, casa e Spotify Connect**, escolha o serviço e clique **Atualizar**. As consultas extras não rodam em segundo plano. Oração é calculada offline. A opção de avisos programa somente os horários restantes **do dia atual**.
+Em **Ajustes → Atalhos e controles → Controles → Integrações**, escolha o serviço e clique **Atualizar**. As consultas extras não rodam em segundo plano. Oração é calculada offline. A opção de avisos programa somente os horários restantes **do dia atual**.
 
 O token Home Assistant é um long-lived access token do seu perfil. Para Spotify Connect, o token precisa de `user-read-playback-state` e `user-modify-playback-state`; a disponibilidade também depende das regras do Spotify. Este plugin não implementa login OAuth nem renovação automática.
 
-## Install, update and remove
+## Instalar e atualizar
 
-Requires the current Omarchy Quickshell shell, Python 3 and Hyprland (Lua configuration). This is not a Waybar plugin.
+O plugin usa o shell Quickshell do Omarchy com Hyprland e Python 3. A versão 0.7.0 foi validada no Omarchy 4.5.0 e no Quickshell 0.3.2 distribuído pelo Omarchy. A integração do volume depende do mecanismo de substituição de OSD do shell.
+
+### Primeira instalação em outro computador
 
 ```sh
 omarchy plugin add https://github.com/Bappoz/notchi-omarchy --enable
 ```
 
-Add `bappoz.notch` to your bar using Omarchy's bar settings. Installing the plugin does not replace your bar layout, change window rules, or install a keyboard binding. The original AI panel can remain enabled alongside Notchi. Use the Omarchy plugin manager to update it.
+O comando instala pelo Git e adiciona o widget à barra. Você pode mudar sua posição nas configurações da barra do Omarchy. Abra o Notchi pelo widget ou passe o mouse sobre a cápsula no topo.
+
+### Atualização de uma instalação existente
+
+Para uma instalação feita com `omarchy plugin add`, execute:
+
+```sh
+omarchy plugin update bappoz.notch
+```
+
+O gerenciador busca a branch padrão no GitHub, mostra o diff e pede confirmação. Se estiver migrando de 0.6.3 ou anterior, carregue a nova entrada do OSD e ative a substituição uma vez:
+
+```sh
+omarchy restart shell
+omarchy plugin enable bappoz.notch
+```
+
+O volume vai para o Notchi. Brilho, mídia e outros avisos do sistema mantêm um OSD separado. Se a instalação foi feita copiando arquivos e o comando disser que a pasta não é um checkout Git, remova essa cópia com `omarchy plugin remove bappoz.notch`. O Omarchy guarda instalações manuais numa pasta de backup. Em seguida, use o comando de primeira instalação. Em um checkout com alterações locais, preserve suas mudanças antes de atualizar.
+
+Confira a versão instalada com:
+
+```sh
+jq -r .version ~/.config/omarchy/plugins/bappoz.notch/manifest.json
+```
+
+### Atalhos e voz
+
+O dock tem um botão de microfone. Para adicionar também os atalhos globais, inclua as linhas desejadas no seu `~/.config/hypr/bindings.lua`, evite duplicatas e recarregue com `hyprctl reload`:
+
+```lua
+o.bind("SUPER + ALT + N", "Notchi", "omarchy-shell bappoz.notch toggle")
+o.bind("SUPER + ALT + V", "Notchi voice", "omarchy-shell bappoz.notch.service voice")
+```
+
+A voz usa `pw-record` e [Superwhisper para Linux](https://superwhisper.com/linux). Experimente “Abra o Firefox”, “Abra o calendário”, “Volume em 40” ou “Pause a música”. O plugin usa a entrada e o modo de transcrição configurados no Superwhisper. No modo Cloud, o Superwhisper envia o áudio para processamento. O Cursor Buddy só aparece se o Hyprland identificar a janela do aplicativo.
+
+### Remoção e dados locais
 
 ```sh
 omarchy plugin remove bappoz.notch
 ```
 
-Removing the plugin does not delete your task list or photos. Settings/tasks live under `~/.local/state/omarchy-notch`, optional integration credentials under `~/.config/omarchy-notch`, and photos under `~/.local/share/omarchy-notch`. Back up these folders before deleting them manually.
+O gerenciador restaura o OSD padrão se ele foi substituído pelo Notchi. Remova os atalhos que adicionou ao Hyprland e recarregue a configuração. A remoção preserva tarefas e ajustes em `~/.local/state/omarchy-notch`, fotos em `~/.local/share/omarchy-notch` e credenciais opcionais em `~/.config/omarchy-notch`. Esses dados são locais e não migram com a instalação em outro computador.
 
 ## Register AI agents and MCPs
 
@@ -117,7 +161,7 @@ Design suggestions, feature ideas, bug reports and pull requests are welcome! Op
 - [ILoveNotch](https://github.com/niyamvora/ILoveNotch), de niyamvora — referência adicional para tarefas e organização do painel de consumo; implementação própria em Qt, sem código Swift ou assets copiados.
 - [Lucide](https://github.com/lucide-icons/lucide) — ícones vetoriais; licenças ISC/MIT incluídas.
 - [Inter](https://github.com/rsms/inter) — tipografia da versão multiplataforma; SIL OFL incluída.
-- [PrayTime](https://github.com/zarrabi/praytime), de Hamid Zarrabi-Zadeh — cálculo offline; código original e licença em `plugin/vendor/`.
+- [PrayTime](https://github.com/zarrabi/praytime), de Hamid Zarrabi-Zadeh — cálculo offline; código original e licença em `vendor/`.
 - [Hyprland: regras de janelas](https://wiki.hypr.land/configuring/core/rules/window-rules/) e [dispatchers](https://wiki.hypr.land/0.57.0/configuring/core/dispatchers/) — APIs de foco/regras verificadas também na instalação local 0.56.2.
 - [Home Assistant REST API](https://contributors.home-assistant.io/core/internals/rest-api/), [Spotify Web API](https://developer.spotify.com/documentation/web-api/reference/get-a-users-available-devices), [Open-Meteo](https://open-meteo.com/en/docs), [Frankfurter](https://frankfurter.dev/), [CoinGecko](https://docs.coingecko.com/reference/coins-markets), [Alpha Vantage](https://www.alphavantage.co/documentation/) e [LRCLIB](https://lrclib.net/docs) — fontes dos conectores opcionais.
 

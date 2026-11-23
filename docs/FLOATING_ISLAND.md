@@ -1,8 +1,9 @@
 # Ilha flutuante
 
 A instância do widget fornece o monitor e um atalho na barra. O `PanelWindow`
-de `Notch.qml` posiciona a cápsula no centro da tela a 8 px da borda superior e
-restringe a região de entrada à ilha e ao menu. As animações abrem a mesma
+de `Notch.qml` posiciona a cápsula no centro da tela. Em repouso ela mede
+32 px de altura com 6 px de margem superior. A janela restringe a região de
+entrada à ilha e ao menu. As animações abrem a mesma
 superfície mantendo posição e escala coerentes durante a transição. Os perfis 3D
 transformam uma captura da superfície visual. O plano de entrada permanece fixo.
 
@@ -47,6 +48,10 @@ a entrega por systemd.
   Alterações externas também são observadas no sink padrão do PipeWire. O
   primeiro valor estabelece uma referência. Brilho e avisos do sistema
   continuam aparecendo na parte inferior.
+- **Silêncio das notificações.** O atalho padrão **Super + Ctrl + Alt + ,**
+  alterna o Não Perturbe do Omarchy. O Notchi acompanha o estado gravado pelo
+  serviço de notificações e só anima mudanças depois da leitura inicial.
+  A confirmação funciona mesmo com **Alertas do desktop** desativado.
 - **Câmera.** A luz verde acompanha fontes V4L2/libcamera ativas no PipeWire
   e processos do usuário com descritores V4L2 abertos. O plugin lê apenas
   metadados. O uso direto de V4L2 é uma aproximação, pois um programa pode

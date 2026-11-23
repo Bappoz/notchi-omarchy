@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 0.8.0
+
+- O sino confirma quando o Não Perturbe é ligado ou desligado. No atalho padrão do Omarchy, use **Super + Ctrl + Alt + ,**.
+- A cápsula em repouso mede 32 px de altura e fica a 6 px da borda superior, com relógio e ícones ajustados.
+- O [tema opcional para o Lock Explorer](README.md#tela-de-bloqueio) mostra um cadeado animado no topo. O campo de senha aparece ao digitar ou clicar no cadeado.
+
 ## 0.7.0
 
 - O dock inferior abre com a ilha e reúne mídia, IA, câmera, voz, arquivos, clipboard, foco, tarefas, clima, sistema e calendário. A engrenagem concentra os ajustes e os links que estavam no menu de reticências.

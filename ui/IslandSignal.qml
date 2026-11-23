@@ -9,6 +9,7 @@ Item {
     property bool motion: true
     property double alertAt: 0
     property real tilt: 0
+    property real glyphSize: 15
 
     implicitWidth: 26
     implicitHeight: 22
@@ -31,7 +32,7 @@ Item {
     Icon {
         id: glyph
         anchors.centerIn: parent
-        size: 15
+        size: Math.round(root.glyphSize)
         color: root.tint
         rotation: root.tilt
         opacity: root.kind === "media" || root.name === "" ? 0 : 1

@@ -36,7 +36,7 @@ Item {
         visible: agents.width < 2 && host.alertProgress < .01 && host.hudProgress < .01
         enabled: visible && !host.opened
         iconName: "emblem-calendar"
-        iconSize: 15
+        iconSize: Math.round(15 - host.restingProgress)
         hint: host.t("calendar.peek")
         idleOpacity: .63
         glyphMotion: host.motion
@@ -49,7 +49,7 @@ Item {
         objectName: "notch-clock"
         anchors.centerIn: parent
         text: host.compactTime
-        font.pixelSize: 16
+        font.pixelSize: Math.round(16 - host.restingProgress)
         font.weight: Font.DemiBold
         opacity: 1 - host.alertProgress
     }
@@ -97,6 +97,7 @@ Item {
             kind: host.activityPeek ? "" : host.signalKind
             name: host.signalIcon
             tint: host.signalTint
+            glyphSize: 15 - host.restingProgress
             motion: host.motion
         }
     }

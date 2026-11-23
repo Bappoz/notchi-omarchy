@@ -84,6 +84,7 @@ BarWidget {
         if (!model || opened) return "";
         if (!focusedScreen) return model.cameraInUse ? "camera" : "";
         if (voiceShowing) return "voice";
+        if (model.notificationHudActive) return "notifications";
         if (model.volumeHudActive) return "volume";
         if (fullscreen) return model.cameraInUse ? "camera" : "";
         if (activityPeek && ["charging", "lowBattery", "chargeFull"].includes(peekNotice.kind)) return peekNotice.kind;
@@ -104,6 +105,11 @@ BarWidget {
         NumberAnimation { duration: root.motion ? Style.duration(190) : 0; easing.type: Easing.OutCubic }
     }
     readonly property bool deviceHud: ["headphones", "bluetooth"].includes(displayedHud)
+    property real restingProgress: !opened && !calendarPeek && !activityPeek && !hudKind
+        && signalKind !== "media" && signalKind !== "working" && !(model && model.islandClock) ? 1 : 0
+    Behavior on restingProgress {
+        NumberAnimation { duration: root.motion ? Style.duration(190) : 0; easing.type: Easing.OutCubic }
+    }
     readonly property string islandState: opened ? "expanded" : activityPeek ? "alert" : hudKind ? "compact"
         : signalKind || (model && model.islandClock) ? "compact" : "idle"
     onActivityPeekChanged: if (activityPeek) calendarPeek = false
@@ -450,9 +456,10 @@ BarWidget {
             id: card
 
             anchors.horizontalCenter: parent.horizontalCenter
-            y: root.topInset - 3 * root.progress
+            y: root.topInset - 3 * root.progress - 2 * root.restingProgress * (1 - root.progress)
             readonly property real regularWidth: root.pillWidth + (282 - root.pillWidth) * root.alertProgress
-            readonly property real hudWidth: root.deviceHud ? 286 : ["volume", "voice"].includes(root.displayedHud) ? 306 : 234
+            readonly property real hudWidth: root.deviceHud ? 286 : ["volume", "voice"].includes(root.displayedHud) ? 306
+                : root.displayedHud === "notifications" ? 264 : 234
             readonly property real compactSize: compactWidth + Math.max(0, 246 - compactWidth) * root.calendarProgress
             property real compactWidth: regularWidth + (hudWidth - regularWidth) * (root.hudKind ? 1 : 0)
             Behavior on compactWidth {
@@ -473,7 +480,9 @@ BarWidget {
                 enabled: root.opened
                 NumberAnimation { duration: root.motion ? Style.duration(240) : 0; easing.type: Easing.OutCubic }
             }
-            readonly property real closedHeight: compactHeight + 184 * Math.max(0, root.calendarReveal)
+            readonly property real visibleCompactHeight: compactHeight - 6 * root.restingProgress
+            readonly property real corner: 19 - 3 * root.restingProgress + 4 * root.alertProgress + 9 * root.progress
+            readonly property real closedHeight: visibleCompactHeight + 184 * Math.max(0, root.calendarReveal)
             width: Math.max(0, Math.min(window.width - 16, compactSize + (expandedTargetWidth - compactSize) * Math.max(0, root.reveal)))
             height: Math.max(0, Math.min(window.height - y, closedHeight + (expandedTargetHeight - closedHeight) * Math.max(0, root.reveal)))
             clip: true
@@ -494,7 +503,7 @@ BarWidget {
                 anchors.fill: parent
             Rectangle {
                 anchors.fill: parent
-                radius: (19 + 4 * root.alertProgress) + 9 * root.progress
+                radius: card.corner
                 color: Qt.tint(root.theme === "midnight" ? "#09090c" : root.theme === "frosted" ? "#f52a2a32" : "#f518181f",
                     Qt.alpha("#07090d", .96 * root.hudProgress))
                 border.width: 1
@@ -504,7 +513,7 @@ BarWidget {
             UI.IslandOrbit {
                 objectName: "notch-orbit"
                 anchors.fill: parent
-                radius: 19 + 4 * root.alertProgress + 9 * root.progress
+                radius: card.corner
                 tint: root.signalTint
                 opacity: (1 - root.progress) * (1 - root.hudProgress)
                 running: root.progress < .99 && ["media", "working"].includes(root.signalKind)
@@ -516,7 +525,7 @@ BarWidget {
                 id: pill
                 objectName: "notch-pill"
                 width: Math.min(card.width, card.compactSize)
-                height: card.compactHeight
+                height: card.visibleCompactHeight
                 anchors.horizontalCenter: parent.horizontalCenter
                 opacity: Math.max(0, 1 - root.progress * 3.5)
                 visible: opacity > 0
@@ -549,15 +558,15 @@ BarWidget {
 
                 Loader {
                     anchors.fill: parent
-                    active: root.displayedHud === "voice" && !!root.model && root.hudProgress > 0
-                    sourceComponent: UI.VoiceHud { host: root }
+                    active: ["voice", "notifications"].includes(root.displayedHud) && !!root.model && root.hudProgress > 0
+                    sourceComponent: root.displayedHud === "notifications" ? notificationOverlay : voiceOverlay
                     opacity: root.hudProgress
                 }
 
                 UI.HardwareHud {
                     anchors.fill: parent
                     host: root
-                    opacity: root.displayedHud === "voice" ? 0 : root.hudProgress
+                    opacity: ["voice", "notifications"].includes(root.displayedHud) ? 0 : root.hudProgress
                     visible: opacity > 0
                 }
 
@@ -746,9 +755,16 @@ BarWidget {
         }
 
         Rectangle {
-            readonly property bool showing: root.opened && root.focusedScreen && !!root.model && (root.model.volumeHudActive || root.voiceShowing)
+            readonly property string kind: {
+                if (!root.opened || !root.focusedScreen || !root.model) return "";
+                if (root.voiceShowing) return "voice";
+                if (root.model.notificationHudActive) return "notifications";
+                return root.model.volumeHudActive ? "volume" : "";
+            }
+            property string displayedKind: ""
+            onKindChanged: if (kind) displayedKind = kind
             visible: opacity > 0
-            opacity: showing ? 1 : 0
+            opacity: kind ? 1 : 0
             anchors.horizontalCenter: parent.horizontalCenter
             y: card.y + card.height + 6 - 4 * (1 - opacity)
             width: 264
@@ -762,7 +778,8 @@ BarWidget {
             Loader {
                 anchors.fill: parent
                 active: parent.visible
-                sourceComponent: root.voiceShowing ? voiceOverlay : volumeOverlay
+                sourceComponent: parent.displayedKind === "voice" ? voiceOverlay
+                    : parent.displayedKind === "notifications" ? notificationOverlay : volumeOverlay
             }
 
             Component {
@@ -774,6 +791,11 @@ BarWidget {
                 id: volumeOverlay
                 UI.HardwareHud { host: root; kind: "volume" }
             }
+        }
+
+        Component {
+            id: notificationOverlay
+            UI.NotificationHud { host: root }
         }
 
         Rectangle {

@@ -25,6 +25,8 @@ Item {
   property bool volumeHudActive: false
   property int volumeHudLevel: 0
   property bool volumeHudMuted: false
+  readonly property bool notificationsMuted: notificationSource.quiet
+  readonly property alias notificationHudActive: notificationHudTimer.running
   property double lastOsdVolumeAt: 0
   property bool cameraInUse: false
   property var previousPower: null
@@ -169,6 +171,7 @@ Item {
     lastAgentStates = null
     previousPower = null
     volumeHudActive = false
+    notificationHudTimer.stop()
     previousConnections = ({})
     noticeQueue = []
     noticeSeen = []
@@ -249,11 +252,17 @@ Item {
   }
 
   NotificationSource {
+    id: notificationSource
     enabledSource: root.pollingEnabled && root.preferences.desktopNotices === "true"
     onReceived: function(event) { root.enqueueNotice(event) }
-    onQuietChanged: if (quiet) root.clearDesktopNotices()
+    onQuietChanged: {
+      if (quiet) root.clearDesktopNotices()
+      if (quietReady && root.noticeClock() && root.sessionAvailable) notificationHudTimer.restart()
+    }
     onEnabledSourceChanged: if (!enabledSource) root.clearDesktopNotices()
   }
+
+  Timer { id: notificationHudTimer; interval: 1500 }
 
   function clearDesktopNotices() {
     noticeQueue = noticeQueue.filter(function(event) { return !event.source })

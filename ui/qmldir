@@ -19,6 +19,7 @@ CompactAgent 1.0 CompactAgent.qml
 IslandOrbit 1.0 IslandOrbit.qml
 LevelRing 1.0 LevelRing.qml
 HardwareHud 1.0 HardwareHud.qml
+NotificationHud 1.0 NotificationHud.qml
 CameraLight 1.0 CameraLight.qml
 SettingsButton 1.0 SettingsButton.qml
 NavigationDock 1.0 NavigationDock.qml

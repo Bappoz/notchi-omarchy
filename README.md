@@ -2,19 +2,39 @@
 
 Ilha dinâmica nativa para o shell do Omarchy, inspirada em [OpenNotchi, de nannndev](https://github.com/nannndev/OpenNotchi). Adaptação independente para Linux/Wayland, em QML/Quickshell, sob licença MIT. A superfície flutuante usa geometria e transições próprias em QML. As telas detalhadas mantêm a linhagem do OpenNotchi. Logos de provedores vêm do repositório; os vetores Lucide vêm da mesma biblioteca da versão Windows. Os créditos e as licenças estão preservados. Third-party sources and licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-[Versão 0.7.0](https://github.com/Bappoz/notchi-omarchy/releases/tag/v0.7.0) · [Instalação e atualização](#instalar-e-atualizar) · [Histórico de versões](CHANGELOG.md)
+[Versão 0.8.0](https://github.com/Bappoz/notchi-omarchy/releases/tag/v0.8.0) · [Instalação e atualização](#instalar-e-atualizar) · [Histórico de versões](CHANGELOG.md)
 
 ![Notchi com os controles de mídia abertos](screenshots/island-media.png)
 
 ## Usar
 
 - Passe o mouse sobre a cápsula no topo para abrir a ilha com os atalhos na parte inferior. Um clique abre e fixa a ilha no monitor em foco. Se configurado, **Super + Alt + N** também abre a ilha. **Esc** fecha.
-- A roda do mouse sobre a cápsula ajusta o volume. Quando a barra fica no topo, a cápsula ocupa o centro junto à borda, com 8 px de respiro.
+- A roda do mouse sobre a cápsula ajusta o volume. Em repouso, a cápsula mede 32 px de altura e fica a 6 px da borda superior.
+- **Super + Ctrl + Alt + ,** alterna o modo silencioso das notificações no Omarchy. A ilha mostra o sino e confirma o novo estado.
 - Clique no calendário discreto à esquerda da hora para abrir o mês, com um ponto no dia de hoje.
 - A engrenagem reúne aparência, integrações, atalhos e controles. Clique nela de novo para voltar à página anterior. **Ctrl + 1 … 8** mantém os atalhos das seções.
 - As teclas de volume e a roda do mouse mostram o nível na ilha. A câmera em uso mantém um sinal verde. A ilha também avisa sobre conexão Bluetooth, início de carga, bateria a 20% ou menos e carga completa.
 - O microfone no dock ou **Super + Alt + V**, se configurado, inicia um comando de voz. Espere aparecer **Ouvindo…**, fale e acione o mesmo controle para enviar.
 - Ative **Ajustes → Aparência → Alertas do desktop** para chamadas, notificações e transferências. Para exemplos sem contas reais e a matriz de validação, veja [Ilha flutuante](docs/FLOATING_ISLAND.md).
+
+## Tela de bloqueio
+
+Com o [Lock Explorer](https://github.com/sirjul1337/omarchy-lock-explorer)
+ativo como serviço de bloqueio, copie o tema opcional do Notchi para a pasta
+de temas personalizados. Execute os comandos abaixo na raiz do repositório.
+
+```sh
+mkdir -p ~/.config/omarchy/lock-designs
+cp extras/lock-designs/Notchi.qml ~/.config/omarchy/lock-designs/Notchi.qml
+omarchy shell lock rescanDesigns
+omarchy shell lock designs
+omarchy shell lock setDesign my-notchi
+omarchy shell lock setUnlockAnimation fade
+```
+
+O Notchi fica no topo, fechado em um círculo. Digite a senha ou clique no
+cadeado para revelar o campo. **Super + Ctrl + L** aciona o bloqueio do Omarchy.
+Após a autenticação pelo Lock Explorer, a cápsula se alarga e o cadeado abre.
 
 ## O que está incluído
 

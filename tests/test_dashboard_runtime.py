@@ -39,7 +39,10 @@ class DashboardRuntimeTests(unittest.TestCase):
                 return r.stdout.strip()
 
             with (folder / "log").open("w") as log:
-                env = {**os.environ, "XDG_STATE_HOME": str(folder / "state")}
+                env = {**os.environ, "HOME": str(folder / "home"), "XDG_STATE_HOME": str(folder / "state")}
+                quiet = folder / "home/.local/state/omarchy/notifications/quiet.json"
+                quiet.parent.mkdir(parents=True)
+                quiet.write_text('{"dnd":true}')
                 usage = folder / "state/omarchy/agents/usage"
                 usage.mkdir(parents=True)
                 (usage / "codex.json").write_text(
@@ -90,8 +93,21 @@ class DashboardRuntimeTests(unittest.TestCase):
                         time.sleep(0.1)
                     initial = json.loads(ipc("island"))
                     self.assertEqual(initial["state"], "idle")
-                    self.assertEqual(initial["y"], 8)
+                    self.assertEqual(initial["y"], 6)
+                    self.assertEqual(initial["height"], 32)
                     self.assertLess(initial["width"], 220)
+                    self.assertEqual(json.loads(ipc("notificationHud")), {"active": False, "muted": True, "slash": None})
+                    for muted in (False, True, False):
+                        # The notification daemon replaces the file atomically.
+                        update = quiet.with_suffix(".tmp")
+                        update.write_text(json.dumps({"dnd": muted}))
+                        update.replace(quiet)
+                        deadline = time.monotonic() + 1
+                        while json.loads(ipc("notificationHud")) != {"active": True, "muted": muted, "slash": int(muted)}:
+                            self.assertLess(time.monotonic(), deadline, "Bell and slash did not reach the expected state")
+                            time.sleep(.03)
+                    time.sleep(1.85)
+                    self.assertEqual(json.loads(ipc("notificationHud")), {"active": False, "muted": False, "slash": None})
                     self.assertEqual(json.loads(ipc("islandEvents")), {
                         "baseline": "idle", "finished": "done", "call": "call", "recent": "call"
                     })

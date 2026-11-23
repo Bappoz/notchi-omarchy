@@ -7,20 +7,26 @@ Item {
 
     property bool enabledSource: false
     property bool quiet: false
+    property bool quietReady: false
     readonly property string adapterPath: decodeURIComponent(Qt.resolvedUrl("island_events.py").toString().replace(/^file:\/\//, ""))
     signal received(var event)
 
     FileView {
         id: quietFile
-        path: root.enabledSource ? Quickshell.env("HOME") + "/.local/state/omarchy/notifications/quiet.json" : ""
+        path: Quickshell.env("HOME") + "/.local/state/omarchy/notifications/quiet.json"
         watchChanges: true
         printErrors: false
         onFileChanged: reload()
         onLoaded: {
-            try { root.quiet = JSON.parse(text()).dnd === true; }
-            catch (error) { root.quiet = false; }
+            try {
+                var dnd = JSON.parse(text()).dnd;
+                if (typeof dnd === "boolean") root.quiet = dnd;
+            } catch (error) {
+                // A new store is empty. Keep the last state if a reload is incomplete.
+            }
+            root.quietReady = true;
         }
-        onLoadFailed: root.quiet = false
+        onLoadFailed: root.quietReady = true
     }
 
     Process {

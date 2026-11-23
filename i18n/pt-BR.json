@@ -20,6 +20,8 @@
   "hud.connected": "Conectado",
   "hud.camera": "Câmera em uso",
   "hud.muted": "Sem som",
+  "hud.notificationsMuted": "Notificações silenciadas",
+  "hud.notificationsOn": "Notificações ativas",
   "hud.charging": "Carregando",
   "hud.lowBattery": "Bateria baixa",
   "hud.chargeFull": "Carga concluída",

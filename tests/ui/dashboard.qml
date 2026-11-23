@@ -71,7 +71,12 @@ ShellRoot {
         function island():string {
             var pill = root.findObject("notch-pill")
             var surface = root.findObject("notch-live-surface")
-            return JSON.stringify({state:notch.islandState, width:pill.width, y:surface.parent.y, tab:notch.currentTab})
+            return JSON.stringify({state:notch.islandState, width:pill.width, height:pill.height, y:surface.parent.y, tab:notch.currentTab})
+        }
+        function notificationHud():string {
+            var hud = root.findObject("notch-notification-hud")
+            return JSON.stringify({active:!!hud && hud.visible, muted:backend.notificationsMuted,
+                slash:hud ? hud.slash : null})
         }
         function hardware(test: string): string {
             notch.close()

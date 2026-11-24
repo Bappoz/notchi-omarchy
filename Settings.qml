@@ -186,6 +186,46 @@ Item {
                     font.weight: Font.Bold
                 }
 
+                Repeater {
+                    model: [
+                        {key: "islandScale", low: 70, high: 125, step: 5, unit: "%", fallback: 100},
+                        {key: "islandOffsetX", low: -2000, high: 2000, step: 5, unit: "px", fallback: 0},
+                        {key: "islandOffsetY", low: -200, high: 200, step: 2, unit: "px", fallback: 0}
+                    ]
+
+                    RowLayout {
+                        id: geometryRow
+                        required property var modelData
+                        Layout.fillWidth: true
+
+                        PlainLabel {
+                            Layout.fillWidth: true
+                            text: root.t(geometryRow.modelData.key) + " (" + geometryRow.modelData.unit + ")"
+                            font.pixelSize: 11
+                        }
+
+                        SpinBox {
+                            id: geometryControl
+                            from: geometryRow.modelData.low
+                            to: geometryRow.modelData.high
+                            stepSize: geometryRow.modelData.step
+                            value: root.host ? root.host.numericSetting(geometryRow.modelData.key,
+                                geometryRow.modelData.fallback, from, to) : geometryRow.modelData.fallback
+                            enabled: !!root.model
+                            editable: true
+                            Accessible.name: root.t(geometryRow.modelData.key)
+                            onValueModified: saveGeometry.restart()
+
+                            Timer {
+                                id: saveGeometry
+                                interval: 180
+                                onTriggered: if (root.model) root.model.action("setting",
+                                    [geometryRow.modelData.key, String(geometryControl.value)])
+                            }
+                        }
+                    }
+                }
+
                 PlainLabel {
                     text: root.t("theme")
                     font.pixelSize: 11

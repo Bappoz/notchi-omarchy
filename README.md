@@ -2,14 +2,15 @@
 
 Ilha dinâmica nativa para o shell do Omarchy, inspirada em [OpenNotchi, de nannndev](https://github.com/nannndev/OpenNotchi). Adaptação independente para Linux/Wayland, em QML/Quickshell, sob licença MIT. A superfície flutuante usa geometria e transições próprias em QML. As telas detalhadas mantêm a linhagem do OpenNotchi. Logos de provedores vêm do repositório; os vetores Lucide vêm da mesma biblioteca da versão Windows. Os créditos e as licenças estão preservados. Third-party sources and licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-[Versão 0.8.0](https://github.com/Bappoz/notchi-omarchy/releases/tag/v0.8.0) · [Instalação e atualização](#instalar-e-atualizar) · [Histórico de versões](CHANGELOG.md)
+[Versão 0.9.0](https://github.com/Bappoz/notchi-omarchy/releases/tag/v0.9.0) · [Instalação e atualização](#instalar-e-atualizar) · [Histórico de versões](CHANGELOG.md)
 
 ![Notchi com os controles de mídia abertos](screenshots/island-media.png)
 
 ## Usar
 
 - Passe o mouse sobre a cápsula no topo para abrir a ilha com os atalhos na parte inferior. Um clique abre e fixa a ilha no monitor em foco. Se configurado, **Super + Alt + N** também abre a ilha. **Esc** fecha.
-- A roda do mouse sobre a cápsula ajusta o volume. Em repouso, a cápsula mede 32 px de altura e fica a 6 px da borda superior.
+- A roda do mouse sobre a cápsula ajusta o volume. Por padrão, a cápsula em repouso fica centralizada na barra superior. Em **Ajustes → Aparência**, ajuste o tamanho e os deslocamentos horizontal e vertical. Para voltar ao padrão, use **100%** e **0 px** nos dois deslocamentos.
+- Passe o mouse sobre a engrenagem ao lado da cápsula para revelar os controles de gravação, Manter acordado, Luz noturna, Não Perturbe e Lembrete. Clique na engrenagem para abrir Ajustes. Durante a gravação, ela pulsa em vermelho. Abra os controles e clique no quadrado vermelho para parar.
 - **Super + Ctrl + Alt + ,** alterna o modo silencioso das notificações no Omarchy. A ilha mostra o sino e confirma o novo estado.
 - Clique no calendário discreto à esquerda da hora para abrir o mês, com um ponto no dia de hoje.
 - A engrenagem reúne aparência, integrações, atalhos e controles. Clique nela de novo para voltar à página anterior. **Ctrl + 1 … 8** mantém os atalhos das seções.

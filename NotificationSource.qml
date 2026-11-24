@@ -8,6 +8,8 @@ Item {
     property bool enabledSource: false
     property bool quiet: false
     property bool quietReady: false
+    property bool countNeeded: false
+    property int count: -1
     readonly property string adapterPath: decodeURIComponent(Qt.resolvedUrl("island_events.py").toString().replace(/^file:\/\//, ""))
     signal received(var event)
 
@@ -45,6 +47,28 @@ Item {
     }
 
     onEnabledSourceChanged: if (!enabledSource) retry.stop()
+    onCountNeededChanged: if (!countNeeded) count = -1
+
+    // Read the daemon's numeric count while a bell HUD needs it. No message
+    // text or history is needed, and a missing daemon leaves the count unknown.
+    Process {
+        id: countReader
+        command: ["omarchy-shell", "-q", "notifications", "count"]
+        stdout: StdioCollector { id: countOutput }
+        onExited: function(code) {
+            if (!root.countNeeded) return;
+            var value = countOutput.text.trim();
+            root.count = code === 0 && /^\d{1,6}$/.test(value) ? Number(value) : -1;
+        }
+    }
+
+    Timer {
+        interval: 400
+        repeat: true
+        triggeredOnStart: true
+        running: root.countNeeded
+        onTriggered: if (!countReader.running) countReader.running = true
+    }
 
     Timer { id: retry; interval: 30000 }
 }

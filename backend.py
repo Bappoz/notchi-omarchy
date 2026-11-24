@@ -611,7 +611,9 @@ def main():
             else: raise ValueError('Nenhuma cor selecionada')
         elif action=='setting':
             key,value=args
-            if key not in ('theme','animations','hover','monitor','animationStyle','desktopNotices'): raise ValueError('Opção inválida')
+            if key not in ('theme', 'animations', 'hover', 'monitor', 'animationStyle', 'desktopNotices',
+                           'islandScale', 'islandOffsetX', 'islandOffsetY'):
+                raise ValueError('Opção inválida')
             with locked_state() as state: state.setdefault('settings',{})[key]=value
             result={'message':'Preferência salva'}
         elif action in ('integration-config','integration-settings','integration-save','weather','prayers','prayer-alerts','markets','home-states','home-command','lyrics-online','spotify-devices','spotify-transfer'):

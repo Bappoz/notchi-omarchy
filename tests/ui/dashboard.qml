@@ -5,7 +5,11 @@ import Quickshell.Io
 import "Plugin" as Plugin
 ShellRoot {
     id:root
-    Plugin.Service{id:backend;pollingEnabled:false}
+    Plugin.Service{
+        id:backend
+        pollingEnabled:false
+        function exec(argv) { root.lastCommand = argv }
+    }
     Plugin.DesktopOsd{id:desktopOsd}
     QtObject{id:fakeShell;function serviceFor(id){return backend}}
     QtObject {
@@ -14,8 +18,8 @@ ShellRoot {
         property int barSize:28
         property bool vertical:false
         property string position:"top"
-        function requestPopout(item){}
-        function releasePopout(item){}
+        property int popoutRequests: 0
+        function requestPopout(item){popoutRequests++}
         function moduleWidgets(id){return [notch]}
     }
     PanelWindow {
@@ -40,9 +44,23 @@ ShellRoot {
         return visit(notch)
     }
     property string result:""
+    property var lastCommand: []
     property int oldTaskRevision:0
     IpcHandler {
         target:"dashboard-test"
+        function quickControls():string {
+            var controls = root.findObject("notch-quick-controls")
+            return controls ? JSON.stringify({open: controls.expanded, progress: controls.progress,
+                recording: controls.recording, pulse: controls.recordingPulse, islandOpen: notch.opened,
+                triggerDiameter: controls.triggerDiameter, actionDiameter: controls.actionDiameter,
+                gap: controls.budDistance - controls.triggerDiameter / 2}) : "{}"
+        }
+        function quickHover():void {
+            var trigger = root.findObject("notch-quick-trigger")
+            if (trigger) events.mouseMove(trigger, trigger.width / 2, trigger.height / 2)
+        }
+        function recording(active:bool):void { backend.screenRecording = active }
+        function command():string { return JSON.stringify(root.lastCommand) }
         function prepare(style:string):void{
             notch.close()
             var pill=root.findObject("notch-pill")
@@ -71,12 +89,48 @@ ShellRoot {
         function island():string {
             var pill = root.findObject("notch-pill")
             var surface = root.findObject("notch-live-surface")
-            return JSON.stringify({state:notch.islandState, width:pill.width, height:pill.height, y:surface.parent.y, tab:notch.currentTab})
+            var card = surface.parent
+            return JSON.stringify({state:notch.islandState, width:pill.width, height:pill.height, y:card.y,
+                offsetX:card.x + card.width / 2 - card.parent.width / 2, tab:notch.currentTab})
+        }
+        function geometry(scale: int, x: int, y: int): void {
+            notch.settings = {islandScale: scale, islandOffsetX: x, islandOffsetY: y}
+        }
+        function popoutRequests(): int { return fakeBar.popoutRequests }
+        function batteryPriority(): string {
+            backend.clearNotices()
+            backend.observePower({level: 11, plugged: false, charging: false})
+            backend.enqueueNotice({kind: "notification", source: "Desktop"})
+            backend.observePower({level: 10, plugged: false, charging: false})
+            var hud = notch.hudKind
+            backend.dismissNotice()
+            backend.pumpNotices()
+            var deferred = backend.currentNotice.kind
+            backend.clearNotices()
+            return JSON.stringify({hud: hud, deferred: deferred})
         }
         function notificationHud():string {
             var hud = root.findObject("notch-notification-hud")
             return JSON.stringify({active:!!hud && hud.visible, muted:backend.notificationsMuted,
                 slash:hud ? hud.slash : null})
+        }
+        function desktopEvent(kind:string):void {
+            notch.close()
+            if (kind !== "screenshot") backend.clearNotices()
+            backend.notificationCount = 3
+            backend.enqueueNotice({kind: kind, source: kind === "screenshot" ? "Omasnap" : "Desktop"})
+        }
+        function desktopVisual():string {
+            var bell = root.findObject("notch-notification-hud")
+            var badge = root.findObject("notch-notification-count")
+            return JSON.stringify({bell: !!bell && bell.visible, tint: bell ? String(bell.tint) : "",
+                count: badge ? badge.text : "", screenshot: !!root.findObject("notch-screenshot-hud")})
+        }
+        function quickHighlight(key:string):real {
+            var button = root.findObject("notch-quick-" + key)
+            if (!button) return -1
+            events.mouseMove(button, button.width / 2, button.height / 2)
+            return button.hovered ? 1 : 0
         }
         function hardware(test: string): string {
             notch.close()
@@ -205,6 +259,7 @@ ShellRoot {
         function replayStatus():void{backend.applyStatus(Object.assign({},backend.snapshot,{tasks:[],taskColor:"#e59cae"}),root.oldTaskRevision)}
         function clickObject(name:string):string{var item=root.findObject(name);if(!item)return "missing-"+name;events.mouseMove(item,item.width/2,item.height/2);events.mouseClick(item,item.width/2,item.height/2);return "ok"}
         function editTask():void{root.findObject("daily-page").expanded=backend.tasks[0].id}
+        function taskEditorReady():bool{return !!root.findObject("task-note-"+backend.tasks[0].id)}
         function emojiNote():int{var note=root.findObject("task-note-"+backend.tasks[0].id);note.text="z".repeat(1999)+"😀";return note.length}
         function longNote():int{var note=root.findObject("task-note-"+backend.tasks[0].id);note.text="z".repeat(2001);return note.length}
         function seedRows():string{
@@ -222,6 +277,10 @@ ShellRoot {
         function detail():string{return JSON.stringify({busy:backend.detailBusy,id:backend.agentDetail.id,tokens:backend.agentDetail.todayTokens,error:backend.detailError,section:root.findObject("agents-page").section})}
         function info():string{return JSON.stringify({opened:notch.opened,held:notch.held,tab:notch.currentTab,progress:notch.progress,found:!!root.findObject("notch-live-surface"),pillHover:root.findObject("notch-pill-input").containsMouse,surfaceHover:root.findObject("notch-surface-hover").hovered})}
         function save(path:string):void{var surface=root.findObject("notch-live-surface");if(surface)surface.grabToImage(function(img){img.saveToFile(path)})}
+        function saveControls(path:string):void {
+            var rail = root.findObject("notch-quick-controls")
+            if (rail) rail.grabToImage(function(img) { img.saveToFile(path) })
+        }
         function releaseNotice():string{backend.expandedCount=0;notch.close();backend.pumpNotices();return backend.currentNotice.kind||""}
         function noticeState():string{return JSON.stringify({kind:backend.currentNotice.kind||"",queued:backend.noticeQueue.length})}
         function resumeNotice():string{backend.lastNoticePoll=Date.now()-30000;backend.pumpNotices();return JSON.stringify({kind:backend.currentNotice.kind||"",queued:backend.noticeQueue.length})}

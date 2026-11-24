@@ -4,6 +4,12 @@ from island_events import bluetooth_devices, bluetooth_headsets, classify, pipew
 
 
 class NotificationAdapterTests(unittest.TestCase):
+    def test_omasnap_has_its_own_event_in_any_display_language(self):
+        self.assertEqual(classify("omasnap", "", "", "Captura de tela salva"), ("screenshot", "Omasnap"))
+        self.assertEqual(classify("omasnap", "", "", "Screenshot copied to clipboard"), ("screenshot", "Omasnap"))
+        self.assertEqual(classify("omasnap", "", "", "Screenshot failed: private"), ("report", "Omasnap"))
+        self.assertEqual(classify("Chromium", "", "", "Screenshot saved"), ("notification", "Desktop"))
+
     def test_call_category_and_supported_clients(self):
         self.assertEqual(classify("Vesktop", "", "call.incoming", "private"), ("call", "Discord"))
         self.assertEqual(classify("ElecWhat", "", "", "Chamada de vídeo recebida"), ("call", "WhatsApp"))
@@ -27,6 +33,10 @@ class NotificationAdapterTests(unittest.TestCase):
         self.assertEqual(classify("", "discord", "", "private sender"), ("chat", "Discord"))
         self.assertEqual(classify("my build", "", "system.error", "private path"), ("report", "Desktop"))
         self.assertIsNone(classify("Notchi", "", "", "private focus message"))
+
+    def test_omarchy_battery_warning_is_not_mirrored_as_a_generic_notice(self):
+        self.assertIsNone(classify("omarchy-action", "", "", "Hora de recarregar!", icon="battery-caution"))
+        self.assertEqual(classify("other-app", "", "", "Battery", icon="battery-caution"), ("notification", "Desktop"))
 
 
 class ConnectionAdapterTests(unittest.TestCase):

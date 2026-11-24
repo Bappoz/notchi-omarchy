@@ -91,11 +91,84 @@ class DashboardRuntimeTests(unittest.TestCase):
                         if time.monotonic() > end or process.poll() is not None:
                             self.fail((folder / "log").read_text())
                         time.sleep(0.1)
+                    capture = os.environ.get("NOTCHI_CAPTURE_DIR")
+                    destination = Path(capture) if capture else None
+                    if destination:
+                        destination.mkdir(parents=True, exist_ok=True)
+
+                    def save(name, method="save"):
+                        if not destination:
+                            return
+                        path = destination / (name + ".png")
+                        path.unlink(missing_ok=True)
+                        ipc(method, str(path))
+                        end = time.monotonic() + 3
+                        while not path.exists():
+                            self.assertLess(time.monotonic(), end, name)
+                            time.sleep(0.05)
+
                     initial = json.loads(ipc("island"))
                     self.assertEqual(initial["state"], "idle")
-                    self.assertEqual(initial["y"], 6)
-                    self.assertEqual(initial["height"], 32)
+                    self.assertEqual(initial["y"], 0)
+                    self.assertEqual(initial["height"], 28)
                     self.assertLess(initial["width"], 220)
+                    self.assertAlmostEqual(initial["offsetX"], 0, delta=1)
+                    resting = json.loads(ipc("quickControls"))
+                    self.assertFalse(resting["open"])
+                    self.assertLessEqual(resting["triggerDiameter"], 18)
+                    self.assertLessEqual(resting["actionDiameter"], 20)
+                    self.assertGreaterEqual(resting["gap"], 3)
+                    ipc("quickHover")
+                    time.sleep(.45)
+                    quick = json.loads(ipc("quickControls"))
+                    self.assertTrue(quick["open"])
+                    self.assertFalse(quick["islandOpen"])
+                    self.assertAlmostEqual(quick["progress"], 1)
+                    save("quick-controls-open", "saveControls")
+                    for key, command in {
+                        "awake": ["omarchy-shell", "idle", "toggle"],
+                        "night": ["omarchy-shell", "nightlight", "toggle"],
+                        "dnd": ["omarchy-shell", "notifications", "toggleDnd"],
+                        "reminder": ["omarchy-reminder", "-i"],
+                    }.items():
+                        self.assertEqual(float(ipc("quickHighlight", key)), 1)
+                        self.assertEqual(ipc("clickObject", "notch-quick-" + key), "ok")
+                        self.assertEqual(json.loads(ipc("command")), command)
+                    self.assertEqual(ipc("clickObject", "notch-quick-record"), "ok")
+                    self.assertEqual(json.loads(ipc("command")), ["omarchy-menu", "toggle", "trigger.capture.screenrecord"])
+                    ipc("recording", "true")
+                    time.sleep(.2)
+                    recording = json.loads(ipc("quickControls"))
+                    self.assertTrue(recording["recording"])
+                    self.assertNotEqual(recording["pulse"], 0)
+                    self.assertEqual(ipc("clickObject", "notch-quick-record"), "ok")
+                    self.assertEqual(json.loads(ipc("command")), ["omarchy-capture-screenrecording", "--stop-recording"])
+                    ipc("leave")
+                    time.sleep(.5)
+                    self.assertFalse(json.loads(ipc("quickControls"))["open"])
+                    save("quick-controls-recording", "saveControls")
+                    ipc("reducedMotion")
+                    ipc("quickHover")
+                    time.sleep(.15)
+                    quick = json.loads(ipc("quickControls"))
+                    self.assertEqual(quick["progress"], 1)
+                    self.assertEqual(quick["pulse"], 0)
+                    ipc("recording", "false")
+                    ipc("leave")
+                    self.assertEqual(ipc("clickObject", "notch-quick-trigger"), "ok")
+                    self.assertEqual(json.loads(ipc("info"))["tab"], "settings")
+                    ipc("clear")
+                    ipc("prepare", "fluid")
+                    ipc("geometry", "75", "60", "24")
+                    smaller = json.loads(ipc("island"))
+                    self.assertAlmostEqual(smaller["width"], initial["width"] * .75, delta=1)
+                    self.assertAlmostEqual(smaller["height"], 21, delta=1)
+                    self.assertAlmostEqual(smaller["offsetX"], 60, delta=1)
+                    self.assertAlmostEqual(smaller["y"] + smaller["height"] / 2, 38, delta=1)
+                    ipc("geometry", "100", "0", "0")
+                    self.assertEqual(json.loads(ipc("batteryPriority")), {
+                        "hud": "lowBattery", "deferred": "notification"
+                    })
                     self.assertEqual(json.loads(ipc("notificationHud")), {"active": False, "muted": True, "slash": None})
                     for muted in (False, True, False):
                         # The notification daemon replaces the file atomically.
@@ -106,8 +179,23 @@ class DashboardRuntimeTests(unittest.TestCase):
                         while json.loads(ipc("notificationHud")) != {"active": True, "muted": muted, "slash": int(muted)}:
                             self.assertLess(time.monotonic(), deadline, "Bell and slash did not reach the expected state")
                             time.sleep(.03)
+                        self.assertEqual(json.loads(ipc("desktopVisual"))["tint"], "#ffcf66" if muted else "#75e2a7")
                     time.sleep(1.85)
                     self.assertEqual(json.loads(ipc("notificationHud")), {"active": False, "muted": False, "slash": None})
+                    ipc("desktopEvent", "notification")
+                    time.sleep(.35)
+                    self.assertEqual(json.loads(ipc("desktopVisual")), {
+                        "bell": True, "tint": "#ffcf66", "count": "3", "screenshot": False
+                    })
+                    save("island-notification")
+                    ipc("desktopEvent", "screenshot")
+                    time.sleep(.35)
+                    self.assertEqual(json.loads(ipc("desktopVisual")), {
+                        "bell": False, "tint": "", "count": "", "screenshot": True
+                    })
+                    save("island-screenshot")
+                    ipc("clear")
+                    time.sleep(.25)
                     self.assertEqual(json.loads(ipc("islandEvents")), {
                         "baseline": "idle", "finished": "done", "call": "call", "recent": "call"
                     })
@@ -117,22 +205,6 @@ class DashboardRuntimeTests(unittest.TestCase):
                     self.assertEqual(json.loads(ipc("connectionStates")), {
                         "baseline": "", "wifi": "wifi", "headphones": "headphones", "recovered": ""
                     })
-                    capture = os.environ.get("NOTCHI_CAPTURE_DIR")
-                    destination = Path(capture) if capture else None
-                    if destination:
-                        destination.mkdir(parents=True, exist_ok=True)
-
-                    def save(name):
-                        if not destination:
-                            return
-                        path = destination / (name + ".png")
-                        path.unlink(missing_ok=True)
-                        ipc("save", str(path))
-                        end = time.monotonic() + 3
-                        while not path.exists():
-                            self.assertLess(time.monotonic(), end, name)
-                            time.sleep(0.05)
-
                     self.assertEqual(ipc("clickObject", "notch-mini-calendar-toggle"), "ok")
                     time.sleep(.45)
                     calendar = json.loads(ipc("calendarPeekState"))
@@ -248,7 +320,10 @@ class DashboardRuntimeTests(unittest.TestCase):
                         saved["dailyTasks"][0]["title"], "Persisted through the UI"
                     )
                     ipc("editTask")
-                    time.sleep(0.3)
+                    end = time.monotonic() + 2
+                    while ipc("taskEditorReady") != "true":
+                        self.assertLess(time.monotonic(), end, "Task editor did not open")
+                        time.sleep(.05)
                     self.assertEqual(int(ipc("emojiNote")), 1999)
                     self.assertEqual(int(ipc("longNote")), 2000)
                     self.assertEqual(
@@ -350,6 +425,7 @@ class DashboardRuntimeTests(unittest.TestCase):
                         json.loads(ipc("resumeNotice")), {"kind": "", "queued": 0}
                     )
                     ipc("reducedMotion")
+                    self.assertEqual(ipc("popoutRequests"), "0")
                     ipc("open", "system")
                     time.sleep(0.1)
                     self.assertEqual(json.loads(ipc("info"))["progress"], 1)

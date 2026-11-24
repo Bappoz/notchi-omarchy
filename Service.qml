@@ -26,10 +26,27 @@ Item {
   property int volumeHudLevel: 0
   property bool volumeHudMuted: false
   readonly property bool notificationsMuted: notificationSource.quiet
+  property int notificationCount: notificationSource.count
   readonly property alias notificationHudActive: notificationHudTimer.running
   property double lastOsdVolumeAt: 0
   property bool cameraInUse: false
+  property bool screenRecording: false
   property var previousPower: null
+
+  // The same read-only status used by Omarchy's recording indicator. One
+  // probe serves every Notchi instance, including recordings started elsewhere.
+  Process {
+    id: recordingStatus
+    command: ["omarchy-capture-screenrecording", "--status"]
+    onExited: function(code) { root.screenRecording = code === 0 }
+  }
+  Timer {
+    interval: 1500
+    repeat: true
+    triggeredOnStart: true
+    running: root.pollingEnabled
+    onTriggered: if (!recordingStatus.running) recordingStatus.running = true
+  }
 
   function showVolume(level, muted, allowEarlySession) {
     if (!sessionAvailable && !allowEarlySession) return
@@ -217,8 +234,12 @@ Item {
     if (recentNotice.kind && now - recentNotice.queuedAt >= 300000) recentNotice = ({})
     if (!noticeQueue.length || expandedCount > 0) return
     var next = noticeQueue[0]
-    if (noticeTimer.running && (next.kind !== "call" || currentNotice.kind === "call")) return
+    var batteryOverNotification = next.kind === "lowBattery" && currentNotice.kind === "notification"
+    var screenshotOverNotification = next.kind === "screenshot" && ["notification", "chat"].includes(currentNotice.kind)
+    var incomingCall = next.kind === "call" && currentNotice.kind !== "call"
+    if (noticeTimer.running && !incomingCall && !batteryOverNotification && !screenshotOverNotification) return
     noticeQueue = noticeQueue.slice(1)
+    if (batteryOverNotification || screenshotOverNotification) noticeQueue = Events.queue(noticeQueue, currentNotice)
     currentNotice = next
     recentNotice = next
     noticeTimer.restart()
@@ -226,7 +247,7 @@ Item {
 
   Timer {
     id: noticeTimer
-    interval: 4800
+    interval: root.currentNotice.kind === "screenshot" ? 1800 : 4800
     onTriggered: {
       root.currentNotice = ({})
       root.pumpNotices()
@@ -254,6 +275,8 @@ Item {
   NotificationSource {
     id: notificationSource
     enabledSource: root.pollingEnabled && root.preferences.desktopNotices === "true"
+    countNeeded: root.pollingEnabled && (root.notificationHudActive
+      || ["notification", "chat"].includes(root.currentNotice.kind))
     onReceived: function(event) { root.enqueueNotice(event) }
     onQuietChanged: {
       if (quiet) root.clearDesktopNotices()

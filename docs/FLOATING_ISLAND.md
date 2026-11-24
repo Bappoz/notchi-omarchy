@@ -1,8 +1,11 @@
 # Ilha flutuante
 
 A instância do widget fornece o monitor e um atalho na barra. O `PanelWindow`
-de `Notch.qml` posiciona a cápsula no centro da tela. Em repouso ela mede
-32 px de altura com 6 px de margem superior. A janela restringe a região de
+de `Notch.qml` centraliza a cápsula na tela e alinha sua altura em repouso à
+barra superior. Em **Ajustes → Aparência**, a escala vai de 70% a 125% e
+valores positivos de deslocamento movem a ilha para a direita e para baixo.
+O conteúdo acompanha a escala e a ilha fica dentro dos limites da tela.
+A janela restringe a região de
 entrada à ilha e ao menu. As animações abrem a mesma
 superfície mantendo posição e escala coerentes durante a transição. Os perfis 3D
 transformam uma captura da superfície visual. O plano de entrada permanece fixo.
@@ -13,6 +16,7 @@ transformam uma captura da superfície visual. O plano de entrada permanece fixo
 | Compacto | Onda de mídia, mascotes dos provedores ativos, contador de tempo ou último sinal | Toque uma faixa MPRIS, observe um agente executando e inicie um timer em Foco. Mídia e mascotes podem aparecer juntos, com o relógio no centro |
 | Alerta | Texto curto, ícone em movimento e retorno automático | Envie os eventos de teste abaixo. Chamadas podem antecipar outro aviso. Depois da transição, o ícone mais recente pode ficar visível por até cinco minutos |
 | Expandido | Título, artista e controles MPRIS, cronômetro e dock inferior | Passe o mouse e saia da cápsula. Clique para fixar, navegue pelo dock e feche com Esc ou clique fora |
+| Controles rápidos | Engrenagem ao lado da cápsula que libera cinco atalhos em sequência | Passe o mouse e confira o contorno de cada botão. Clique na engrenagem para abrir Ajustes |
 
 **Ajustes → Aparência** mantém os nove perfis de abertura. `Fluid Classic` é o
 perfil padrão. Desative **Animações** para conferir que a geometria, o sino,
@@ -38,6 +42,10 @@ a entrega por systemd.
   para classificar avisos de arquivo recebido do Omdrop. O serviço de notificações do desktop mantém a entrega e as ações
   originais. O adaptador respeita o Não Perturbe do Omarchy quando o estado
   `notifications/quiet.json` está disponível.
+- **Sino e captura.** O sino amarelo mostra quantas notificações o daemon do
+  Omarchy mantém ativas. A contagem fica oculta se o daemon não a fornecer.
+  Capturas anunciadas pelo Omasnap mostram uma câmera azul com flash na ilha.
+  [Sino com contador](../screenshots/island-notification.png) · [Captura de tela](../screenshots/island-screenshot.png) · [Origem do evento no Omasnap](https://github.com/omacom/omasnap/blob/v1.25.0/src/capture.cpp#L2790-L2805).
 - **Chamadas e transferências.** WhatsApp/ElecWhat e Discord/Vesktop são
   classificados por categoria de chamada ou por títulos reconhecidos em
   português e inglês. Omdrop/AirDrop e LocalSend usam a identificação da
@@ -51,14 +59,20 @@ a entrega por systemd.
 - **Silêncio das notificações.** O atalho padrão **Super + Ctrl + Alt + ,**
   alterna o Não Perturbe do Omarchy. O Notchi acompanha o estado gravado pelo
   serviço de notificações e só anima mudanças depois da leitura inicial.
-  A confirmação funciona mesmo com **Alertas do desktop** desativado.
+  O sino fica verde ao reativar as notificações. A confirmação funciona
+  mesmo com **Alertas do desktop** desativado.
 - **Câmera.** A luz verde acompanha fontes V4L2/libcamera ativas no PipeWire
   e processos do usuário com descritores V4L2 abertos. O plugin lê apenas
   metadados. O uso direto de V4L2 é uma aproximação, pois um programa pode
   manter o dispositivo aberto sem captar imagens.
-- **Bateria.** O UPower informa a conexão à energia, a passagem para 20% e a
-  conclusão da carga. Uma amostra inicial já carregada ou descarregada serve
-  de referência.
+- **Gravação de tela.** O serviço consulta localmente o status do gravador do
+  Omarchy a cada 1,5 segundo. A bolinha pulsa em vermelho e o botão de
+  gravação vira um quadrado para parar. Com as animações desativadas, o
+  vermelho fica estático. Os comandos usam o menu e o gravador do Omarchy.
+- **Bateria.** O UPower informa a conexão à energia, as passagens para 20% e
+  10% em descarga e a conclusão da carga. A amostra inicial serve de referência.
+  O aviso de recarga do Omarchy segue para o desktop. Seu ícone
+  `battery-caution` permite ignorar a cópia genérica na ilha, sem depender do idioma.
 - **Wi‑Fi e Bluetooth.** A consulta usa NetworkManager e BlueZ a cada três
   segundos. A ilha mostra o nome local do dispositivo Bluetooth e o nível
   da bateria se o BlueZ o publicar. No BlueZ padrão, o nível disponível é
@@ -111,11 +125,17 @@ Execute a última linha em um perfil Wayland descartável. O teste de interface
 usa um player MPRIS sintético e a variável `NOTCHI_CAPTURE_DIR` para capturas.
 Ele percorre os nove perfis, saída por hover, navegação fixada, retorno de
 detalhes de provedor, movimento reduzido e reprodução/pausa. Também exercita
+os cinco controles rápidos com comandos interceptados e gravação simulada,
 o mini calendário, os atalhos em Ajustes, as mensagens de OSD, eventos de hardware simulados e um comando de voz que
 abre o calendário, sem usar microfone nem serviços externos. As capturas
 `hardware-*.png` e `updated-*.png` mostram os cenários novos.
 
 As imagens abaixo são capturas do QML com dados sintéticos. [Claude e Codex em atividade](../screenshots/island-agents.png) · [Wi-Fi conectado](../screenshots/island-wifi.png) · [Fones conectados](../screenshots/island-headphones.png).
+
+Os controles rápidos abertos e o indicador recolhido durante uma gravação
+simulada. [Controles rápidos](../screenshots/quick-controls-open.png) ·
+[Indicador de gravação](../screenshots/quick-controls-recording.png) ·
+[Referência de movimento no Codenotch](https://github.com/vinzdg/codenotch/blob/8d27091de4e9f0ccfd38066f28f2cabe65fdadc6/Sources/Features/SettingsHandle.swift).
 
 | Repouso | Reprodução | Chamada |
 | --- | --- | --- |

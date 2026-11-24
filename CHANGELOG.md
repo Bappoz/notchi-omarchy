@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 0.9.0
+
+- Controles rápidos animados, gravação de tela e acesso direto aos ajustes.
+- Alertas de notificações com contador e animação própria para capturas.
+- Ajustes de posição e tamanho da ilha, câmera e eventos do desktop.
+
 ## 0.8.0
 
 - O sino confirma quando o Não Perturbe é ligado ou desligado. No atalho padrão do Omarchy, use **Super + Ctrl + Alt + ,**.

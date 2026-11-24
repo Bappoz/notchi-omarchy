@@ -38,30 +38,35 @@ def verify():
         try:
             loop = GLib.MainLoop()
             replies = []
-            deadline = GLib.timeout_add(5000, lambda: (loop.quit(), False)[1])
 
             def done(connection, result):
                 replies.append(connection.call_finish(result).unpack())
                 loop.quit()
 
-            def send():
+            def send(app, summary, hints):
                 conn.call(
                     NAME, PATH, NAME, "Notify",
                     GLib.Variant("(susssasa{sv}i)", (
-                        "Vesktop", 0, "", "A contact is calling", PRIVATE,
-                        [], {"category": GLib.Variant("s", "call.incoming")}, 3000,
+                        app, 0, "", summary, PRIVATE, [], hints, 3000,
                     )), None, Gio.DBusCallFlags.NONE, 2000, None, done,
                 )
                 return False
 
-            GLib.timeout_add(400, send)
-            loop.run()
-            GLib.source_remove(deadline)
-            assert replies == [(41,)] and received == [PRIVATE], (replies, received)
-            assert select.select([monitor.stdout], [], [], 2)[0], "Monitor received no event"
-            line = monitor.stdout.readline()
-            assert json.loads(line) == {"kind": "call", "source": "Discord"}, line
-            assert PRIVATE not in line
+            cases = [
+                ("Vesktop", "A contact is calling", {"category": GLib.Variant("s", "call.incoming")},
+                 {"kind": "call", "source": "Discord"}),
+                ("omasnap", "Captura de tela salva", {}, {"kind": "screenshot", "source": "Omasnap"}),
+            ]
+            for app, summary, hints, expected in cases:
+                deadline = GLib.timeout_add(5000, lambda: (loop.quit(), False)[1])
+                GLib.timeout_add(400, send, app, summary, hints)
+                loop.run()
+                GLib.source_remove(deadline)
+                assert select.select([monitor.stdout], [], [], 2)[0], "Monitor received no event"
+                line = monitor.stdout.readline()
+                assert json.loads(line) == expected, line
+                assert PRIVATE not in line
+            assert replies == [(41,), (41,)] and received == [PRIVATE, PRIVATE], (replies, received)
         finally:
             monitor.terminate()
 

@@ -7,13 +7,15 @@ Item {
     objectName: "notch-notification-hud"
 
     required property var host
-    readonly property bool muted: !!host.model && host.model.notificationsMuted
-    readonly property color tint: muted ? "#ff947e" : "#f1f3f9"
+    property bool incoming: false
+    readonly property bool muted: !incoming && !!host.model && host.model.notificationsMuted
+    readonly property int count: host.model ? host.model.notificationCount : -1
+    readonly property color tint: incoming || muted ? "#ffcf66" : "#75e2a7"
     property real slash: 0
     property bool initialized: false
 
     Accessible.role: Accessible.StaticText
-    Accessible.name: label.text
+    Accessible.name: label.text + (count >= 0 ? " · " + I18n.formatNumber(count) : "")
 
     function play() {
         if (!initialized) return
@@ -23,7 +25,7 @@ Item {
 
     Component.onCompleted: {
         // A newly mounted HUD starts from the opposite bell state.
-        if (host.motion) slash = muted ? 0 : 1
+        if (host.motion && !incoming) slash = muted ? 0 : 1
         initialized = true
         Qt.callLater(play)
     }
@@ -82,15 +84,38 @@ Item {
         }
     }
 
+    Rectangle {
+        id: badge
+        anchors.left: symbol.right
+        anchors.leftMargin: 5
+        anchors.verticalCenter: parent.verticalCenter
+        width: Math.max(19, number.implicitWidth + 8)
+        height: 17
+        radius: height / 2
+        color: root.tint
+        visible: root.count >= 0
+
+        App.PlainLabel {
+            id: number
+            objectName: "notch-notification-count"
+            anchors.centerIn: parent
+            text: root.count < 0 ? "" : root.count > 99 ? I18n.formatNumber(99) + "+" : I18n.formatNumber(root.count)
+            color: "#261a0a"
+            font.pixelSize: 10
+            font.weight: Font.Bold
+        }
+    }
+
     App.PlainLabel {
         id: label
-        anchors.left: symbol.right
+        anchors.left: badge.visible ? badge.right : symbol.right
         anchors.leftMargin: 12
         anchors.right: parent.right
         anchors.rightMargin: 17
         anchors.verticalCenter: parent.verticalCenter
         horizontalAlignment: Text.AlignRight
-        text: root.host.t(root.muted ? "hud.notificationsMuted" : "hud.notificationsOn")
+        text: root.incoming ? root.host.noticeLabel : root.host.t(root.muted ? "hud.notificationsMuted" : "hud.notificationsOn")
+        elide: Text.ElideRight
         color: root.tint
         font.pixelSize: 13
         font.weight: Font.DemiBold

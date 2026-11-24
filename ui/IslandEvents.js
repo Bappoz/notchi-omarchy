@@ -2,7 +2,7 @@
 
 var priority = {
     call: 4, attention: 3, timer: 3, transfer: 2, done: 2,
-    report: 2, wifi: 2, headphones: 2, bluetooth: 2,
+    report: 2, screenshot: 2, wifi: 2, headphones: 2, bluetooth: 2,
     charging: 2, lowBattery: 3, chargeFull: 2, agent: 1, chat: 1, notification: 1, weather: 0
 };
 
@@ -53,7 +53,8 @@ function newConnections(previous, sample) {
 function powerEvent(previous, sample) {
     if (!previous || !sample) return "";
     if (!sample.plugged && sample.level <= 20
-            && (previous.level > 20 || previous.plugged)) return "lowBattery";
+            && (previous.level > 20 || previous.plugged
+                || (sample.level <= 10 && previous.level > 10))) return "lowBattery";
     if (sample.plugged && !previous.plugged) return "charging";
     if (sample.plugged && (sample.full || sample.level === 100)
             && previous.charging && !previous.full && previous.level < 100) return "chargeFull";

@@ -48,13 +48,15 @@ BarWidget {
             "done": "circle-check",
             "attention": "bell", "weather": "cloud-sun", "timer": "timer",
             "call": "headphones", "transfer": "arrow-down-to-line",
-            "chat": "bell", "report": "file-text", "notification": "bell",
+            "chat": "bell", "report": "file-text", "notification": "bell", "screenshot": "camera",
             "wifi": "wifi", "headphones": "headphones", "bluetooth": "bluetooth"
         };
         return icons[signalKind] || "";
     }
     readonly property color signalTint: {
         var source = activityPeek ? peekNotice.source : (recentNotice.kind === signalKind ? recentNotice.source : "");
+        if (["notification", "chat"].includes(signalKind)) return "#ffcf66";
+        if (signalKind === "screenshot") return "#a7eaff";
         if (signalKind === "media" || source === "WhatsApp") return "#50df9b";
         if (signalKind === "wifi") return "#78bbff";
         if (signalKind === "headphones") return "#7ce9b9";
@@ -71,6 +73,7 @@ BarWidget {
         if (!notice.kind) return "";
         if (notice.kind === "weather")
             return t("weatherAlert." + notice.event.kind);
+        if (notice.kind === "screenshot") return t("island.screenshot");
         if (notice.provider)
             return (notice.provider === "claude" ? "Claude" : "Codex") + " · " + t("island." + notice.kind);
         return (notice.source ? notice.source + " · " : "") + t("island." + notice.kind);
@@ -84,15 +87,28 @@ BarWidget {
         if (!model || opened) return "";
         if (!focusedScreen) return model.cameraInUse ? "camera" : "";
         if (voiceShowing) return "voice";
+        if (!fullscreen && activityPeek && peekNotice.kind === "lowBattery") return "lowBattery";
         if (model.notificationHudActive) return "notifications";
         if (model.volumeHudActive) return "volume";
         if (fullscreen) return model.cameraInUse ? "camera" : "";
+        if (activityPeek && peekNotice.kind === "screenshot") return "screenshot";
+        if (activityPeek && ["notification", "chat"].includes(peekNotice.kind)) return "incomingNotification";
         if (activityPeek && ["charging", "lowBattery", "chargeFull"].includes(peekNotice.kind)) return peekNotice.kind;
         if (activityPeek && peekNotice.device) return peekNotice.kind;
         if (model.cameraInUse && !activityPeek) return "camera";
         return "";
     }
     property string displayedHud: ""
+    readonly property Component displayedHudComponent: customHud(displayedHud)
+    function customHud(kind) {
+        switch (kind) {
+        case "voice": return voiceOverlay;
+        case "notifications": return notificationOverlay;
+        case "incomingNotification": return incomingNotificationOverlay;
+        case "screenshot": return screenshotOverlay;
+        default: return null;
+        }
+    }
     property real hudProgress: 0
     onHudKindChanged: {
         if (hudKind) {
@@ -128,6 +144,8 @@ BarWidget {
     readonly property var tabs: ["home", "files", "clipboard", "focus", "camera", "agents", "calendar", "tools", "system", "daily", "weather", "quick"]
     readonly property bool motion: setting("animations", true) && (!model || model.preferences.animations !== "false") && Style.duration(100)>0
     readonly property string theme: model && model.preferences.theme ? model.preferences.theme : setting("theme", "glass")
+    readonly property color surfaceColor: theme === "midnight" ? "#09090c"
+        : theme === "frosted" ? "#f52a2a32" : "#f518181f"
     readonly property string animationStyle: model && model.preferences.animationStyle ? model.preferences.animationStyle : setting("animationStyle", "fluid")
     readonly property var animationProfile: Motion.profile(animationStyle)
     readonly property bool spatial: motion && animationStyle.indexOf("3D") >= 0
@@ -168,12 +186,17 @@ BarWidget {
     readonly property bool focusedScreen: !Hyprland.focusedMonitor || Hyprland.focusedMonitor.name === screenName
     readonly property string compactTime: clock.date.toLocaleTimeString(Qt.locale(I18n.formatLocale), "HH:mm")
     readonly property string compactDate: clock.date.toLocaleDateString(Qt.locale(I18n.formatLocale), "ddd d")
-    readonly property int topInset: 8
     readonly property bool topBar: bar && bar.position === "top"
+    readonly property real sizeScale: numericSetting("islandScale", 100, 70, 125) / 100
+    readonly property real horizontalOffset: numericSetting("islandOffsetX", 0, -2000, 2000)
+    readonly property real verticalOffset: numericSetting("islandOffsetY", 0, -200, 200)
+    readonly property real restingHeight: topBar ? Math.max(1, barSize) : 32
+    readonly property real topInset: Math.max(0, Math.min(window.height - 64,
+        (topBar ? barSize / 2 : 22) - restingHeight * sizeScale / 2 + verticalOffset))
     readonly property bool connectionAlert: activityPeek && ["wifi", "headphones"].includes(peekNotice.kind)
     readonly property int expandedWidth: currentTab === "quick" ? 452 : currentTab === "agents" ? 748 : 708
     readonly property int expandedHeight: Math.max(42, Math.min(
-        currentTab === "quick" ? 116 : Motion.height(currentTab, subtab) + 56,
+        (currentTab === "quick" ? 116 : Motion.height(currentTab, subtab) + 56) * sizeScale,
         window.height - topInset - 50))
     property real pillWidth: {
         var agents = model ? model.activeProviders.length : 0;
@@ -191,6 +214,12 @@ BarWidget {
 
     function t(key) {
         return strings.t(key);
+    }
+
+    function numericSetting(key, fallback, lower, upper) {
+        var saved = model ? model.preferences[key] : undefined;
+        var value = Number(saved === undefined || saved === null ? setting(key, fallback) : saved);
+        return Number.isFinite(value) ? Math.max(lower, Math.min(upper, value)) : fallback;
     }
 
     function openOnFocusedScreen() {
@@ -217,9 +246,8 @@ BarWidget {
         if (opened || fullscreen)
             return ;
 
-        if (bar && bar.requestPopout)
-            bar.requestPopout(root);
-
+        // The floating surface has its own focus grab. Registering it as a bar
+        // popout would draw the host's open-panel mark under the widget slot.
         calendarPeek = false;
         opened = true;
         if (model)
@@ -236,10 +264,6 @@ BarWidget {
         held = false;
         if (model)
             model.expanded(false);
-
-        if (bar && bar.releasePopout)
-            bar.releasePopout(root);
-
     }
 
     function toggle() {
@@ -300,7 +324,7 @@ BarWidget {
     }
 
     moduleName: "bappoz.notch"
-    implicitWidth: topBar ? pillWidth : vertical ? barSize : 24
+    implicitWidth: topBar ? pillWidth * sizeScale : vertical ? barSize : 24
     implicitHeight: barSize
     onOpenedChanged: {
         if (opened) hoverTimer.stop();
@@ -412,7 +436,7 @@ BarWidget {
 
         interval: Math.max(100, Math.min(1000, Number(root.setting("hoverDelay", 220))))
         onTriggered: {
-            if (root.hoverEnabled && !root.opened && !root.activityPeek && !root.hudKind && !root.calendarPeek
+            if (root.hoverEnabled && !root.opened && !root.activityPeek && !root.hudKind && !root.calendarPeek && !quickControls.expanded
                     && !compactView.calendarHovered && pillInput.containsMouse)
                 root.openTab("quick");
         }
@@ -437,7 +461,9 @@ BarWidget {
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.namespace: "bappoz-notch"
         WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.keyboardFocus: root.opened ? (root.held && !root.focusPrimed ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand) : root.calendarPeek ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+        WlrLayershell.keyboardFocus: root.opened
+            ? (root.held && !root.focusPrimed ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand)
+            : root.calendarPeek || quickControls.expanded ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
         anchors {
             top: true
@@ -455,11 +481,11 @@ BarWidget {
         Item {
             id: card
 
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: root.topInset - 3 * root.progress - 2 * root.restingProgress * (1 - root.progress)
+            x: Math.max(0, Math.min(window.width - width, (window.width - width) / 2 + root.horizontalOffset))
+            y: root.topInset
             readonly property real regularWidth: root.pillWidth + (282 - root.pillWidth) * root.alertProgress
             readonly property real hudWidth: root.deviceHud ? 286 : ["volume", "voice"].includes(root.displayedHud) ? 306
-                : root.displayedHud === "notifications" ? 264 : 234
+                : root.displayedHudComponent ? 264 : 234
             readonly property real compactSize: compactWidth + Math.max(0, 246 - compactWidth) * root.calendarProgress
             property real compactWidth: regularWidth + (hudWidth - regularWidth) * (root.hudKind ? 1 : 0)
             Behavior on compactWidth {
@@ -469,7 +495,7 @@ BarWidget {
             Behavior on compactHeight {
                 NumberAnimation { duration: root.motion ? Style.duration(190) : 0; easing.type: Easing.OutCubic }
             }
-            readonly property real targetWidth: Math.max(0, Math.min(root.expandedWidth, window.width - 24))
+            readonly property real targetWidth: Math.max(0, Math.min(root.expandedWidth * root.sizeScale, window.width - 24))
             property real expandedTargetWidth: targetWidth
             property real expandedTargetHeight: root.expandedHeight
             Behavior on expandedTargetWidth {
@@ -480,10 +506,10 @@ BarWidget {
                 enabled: root.opened
                 NumberAnimation { duration: root.motion ? Style.duration(240) : 0; easing.type: Easing.OutCubic }
             }
-            readonly property real visibleCompactHeight: compactHeight - 6 * root.restingProgress
-            readonly property real corner: 19 - 3 * root.restingProgress + 4 * root.alertProgress + 9 * root.progress
-            readonly property real closedHeight: visibleCompactHeight + 184 * Math.max(0, root.calendarReveal)
-            width: Math.max(0, Math.min(window.width - 16, compactSize + (expandedTargetWidth - compactSize) * Math.max(0, root.reveal)))
+            readonly property real visibleCompactHeight: (compactHeight + (root.restingHeight - 38) * root.restingProgress) * root.sizeScale
+            readonly property real corner: (19 - 3 * root.restingProgress + 4 * root.alertProgress + 9 * root.progress) * root.sizeScale
+            readonly property real closedHeight: visibleCompactHeight + 184 * root.sizeScale * Math.max(0, root.calendarReveal)
+            width: Math.max(0, Math.min(window.width - 16, compactSize * root.sizeScale + (expandedTargetWidth - compactSize * root.sizeScale) * Math.max(0, root.reveal)))
             height: Math.max(0, Math.min(window.height - y, closedHeight + (expandedTargetHeight - closedHeight) * Math.max(0, root.reveal)))
             clip: true
             focus: root.opened
@@ -504,8 +530,7 @@ BarWidget {
             Rectangle {
                 anchors.fill: parent
                 radius: card.corner
-                color: Qt.tint(root.theme === "midnight" ? "#09090c" : root.theme === "frosted" ? "#f52a2a32" : "#f518181f",
-                    Qt.alpha("#07090d", .96 * root.hudProgress))
+                color: Qt.tint(root.surfaceColor, Qt.alpha("#07090d", .96 * root.hudProgress))
                 border.width: 1
                 border.color: Qt.tint("#34343f", Qt.alpha(root.signalTint, .28 * root.alertProgress))
             }
@@ -524,7 +549,7 @@ BarWidget {
             Item {
                 id: pill
                 objectName: "notch-pill"
-                width: Math.min(card.width, card.compactSize)
+                width: Math.min(card.width, card.compactSize * root.sizeScale)
                 height: card.visibleCompactHeight
                 anchors.horizontalCenter: parent.horizontalCenter
                 opacity: Math.max(0, 1 - root.progress * 3.5)
@@ -548,35 +573,45 @@ BarWidget {
                     Accessible.name: root.t("island.open")
                     Accessible.onPressAction: root.activateIsland()
                 }
-                UI.IslandCompact {
-                    id: compactView
-                    anchors.fill: parent
-                    host: root
-                    opacity: 1 - root.hudProgress
-                    visible: opacity > 0
+                Item {
+                    anchors.centerIn: parent
+                    anchors.alignWhenCentered: false
+                    readonly property real fit: Math.max(.01, Math.min(root.sizeScale,
+                        pill.width / card.compactSize, pill.height / 26))
+                    width: pill.width / fit
+                    height: pill.height / fit
+                    scale: fit
+
+                    UI.IslandCompact {
+                        id: compactView
+                        anchors.fill: parent
+                        host: root
+                        opacity: 1 - root.hudProgress
+                        visible: opacity > 0
+                    }
+
+                    Loader {
+                        anchors.fill: parent
+                        active: !!root.displayedHudComponent && !!root.model && root.hudProgress > 0
+                        sourceComponent: root.displayedHudComponent
+                        opacity: root.hudProgress
+                    }
+
+                    UI.HardwareHud {
+                        anchors.fill: parent
+                        host: root
+                        opacity: root.displayedHudComponent ? 0 : root.hudProgress
+                        visible: opacity > 0
+                    }
                 }
-
-                Loader {
-                    anchors.fill: parent
-                    active: ["voice", "notifications"].includes(root.displayedHud) && !!root.model && root.hudProgress > 0
-                    sourceComponent: root.displayedHud === "notifications" ? notificationOverlay : voiceOverlay
-                    opacity: root.hudProgress
-                }
-
-                UI.HardwareHud {
-                    anchors.fill: parent
-                    host: root
-                    opacity: ["voice", "notifications"].includes(root.displayedHud) ? 0 : root.hudProgress
-                    visible: opacity > 0
-                }
-
-
             }
 
             Loader {
                 id: miniCalendar
                 objectName: "notch-mini-calendar"
                 anchors.horizontalCenter: parent.horizontalCenter
+                scale: root.sizeScale
+                transformOrigin: Item.Top
                 width: 216
                 y: pill.height + 1 - 6 * (1 - root.calendarProgress)
                 active: root.calendarPeek || root.calendarProgress > .001
@@ -615,13 +650,14 @@ BarWidget {
             Item {
                 id: content
 
-                width: Math.max(0, card.expandedTargetWidth - 32)
-                height: Math.max(0, card.expandedTargetHeight - 22)
+                readonly property real fit: Math.max(.01, Math.min(root.sizeScale, card.expandedTargetWidth / root.expandedWidth))
+                width: Math.max(0, card.expandedTargetWidth / fit - 32)
+                height: Math.max(0, card.expandedTargetHeight / fit - 22)
                 enabled: root.opened
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: 11 + (root.spatial ? 0 : root.animationProfile.offset * (1 - root.progress))
+                y: fit * (11 + (root.spatial ? 0 : root.animationProfile.offset * (1 - root.progress)))
                 opacity: Math.max(0, Math.min(1, (root.progress - 0.1) / 0.65))
-                scale: root.spatial ? 1 : root.animationProfile.scale + (1 - root.animationProfile.scale) * root.progress
+                scale: fit * (root.spatial ? 1 : root.animationProfile.scale + (1 - root.animationProfile.scale) * root.progress)
                 transformOrigin: Item.Top
                 layer.enabled: root.motion && root.progress < 0.999 && root.progress > 0.01
 
@@ -798,6 +834,28 @@ BarWidget {
             UI.NotificationHud { host: root }
         }
 
+        Component {
+            id: incomingNotificationOverlay
+            UI.NotificationHud { host: root; incoming: true }
+        }
+
+        Component {
+            id: screenshotOverlay
+            UI.ScreenshotHud { host: root }
+        }
+
+        UI.QuickControls {
+            id: quickControls
+            objectName: "notch-quick-controls"
+            host: root
+            available: !!root.model && !root.fullscreen && !root.opened && root.progress <= .001
+                && !root.activityPeek && !root.calendarPeek && root.hudProgress <= .001
+            leftEdge: card.x
+            rightEdge: card.x + card.width
+            centerY: card.y + card.visibleCompactHeight / 2
+            screenWidth: window.width
+        }
+
         Rectangle {
             visible: root.opened && !!root.model && root.model.feedback !== ""
             anchors.horizontalCenter: parent.horizontalCenter
@@ -821,7 +879,13 @@ BarWidget {
 
         }
 
-        mask: Region { item: root.fullscreen ? null : card }
+        mask: Region {
+            item: root.fullscreen ? null : card
+            Region {
+                item: quickControls.visible ? quickControls : null
+                intersection: Intersection.Combine
+            }
+        }
 
     }
 

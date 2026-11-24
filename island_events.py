@@ -36,13 +36,18 @@ def omdrop_action(hint):
             and PurePath(argv[0]).name == "omdrop" and argv[1:3] == ["act", "open"])
 
 
-def classify(app_name, desktop_entry, category, summary, action=""):
+def classify(app_name, desktop_entry, category, summary, action="", icon=""):
     """Return fixed labels only. Notification text and identities stay out of QML."""
     identity = (app_name[:128] + " " + desktop_entry[:128]).lower()
     category = category[:96].lower()
     summary = summary[:256]
     if re.search(r"\bnotchi\b", identity):
         return None  # Timer completion is already handled by the service.
+    if app_name == "omarchy-action" and icon == "battery-caution":
+        return None  # UPower supplies the battery HUD independently of desktop notices.
+    if app_name.casefold() == "omasnap":
+        # Omasnap sends localized success toasts with this stable app name.
+        return ("report" if summary.startswith("Screenshot failed:") else "screenshot"), "Omasnap"
     if (TRANSFER_SUMMARY.search(identity) or TRANSFER_SUMMARY.match(summary)
             or ("omarchy-action" in identity and omdrop_action(action))):
         return "transfer", "Omdrop"
@@ -235,6 +240,7 @@ def monitor(Gio, GLib):
                     body.get_child_value(0).get_string(), entry.get_string() if entry else "",
                     category.get_string() if category else "", body.get_child_value(3).get_string(),
                     action.get_string() if action else "",
+                    icon=body.get_child_value(2).get_string(),
                 )
                 now = time.monotonic()
                 if event and now - last_sent.get(event, float("-inf")) >= 2:

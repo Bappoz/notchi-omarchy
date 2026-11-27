@@ -32,6 +32,48 @@ Item {
   property bool cameraInUse: false
   property bool screenRecording: false
   property var previousPower: null
+  property bool osdHandoverChecked: false
+  property string osdHandoverProbeOutput: ""
+  property string osdHandoverEnableOutput: ""
+
+  // Upgrades from 0.6.3 or earlier via `omarchy plugin update` rescan plugins
+  // without re-running `enablePlugin`, leaving `omarchy.osd` enabled alongside
+  // Notchi's replacement OSD. Complete the one-time handover via Omarchy IPC.
+  Process {
+    id: osdHandoverProbe
+    command: ["omarchy-shell", "shell", "listPlugins"]
+    stdout: StdioCollector { onStreamFinished: root.osdHandoverProbeOutput = text.slice(0, 200000) }
+    onExited: function(code) {
+      if (code !== 0 || !root.pollingEnabled) return
+      var plugins
+      try { plugins = JSON.parse(root.osdHandoverProbeOutput || "[]") } catch (e) { return }
+      if (Events.needsOsdHandover(plugins) && !osdHandoverEnable.running) {
+        root.osdHandoverEnableOutput = ""
+        osdHandoverEnable.running = true
+      }
+    }
+  }
+  Process {
+    id: osdHandoverEnable
+    command: ["omarchy-shell", "shell", "enablePlugin", "bappoz.notch", "{}"]
+    stdout: StdioCollector { onStreamFinished: root.osdHandoverEnableOutput = text.trim() }
+    onExited: function(code) {
+      if (code === 0 && root.osdHandoverEnableOutput === "ok")
+        root.exec(["omarchy-shell", "shell", "rescanPlugins"])
+    }
+  }
+  Timer {
+    interval: 1500
+    repeat: false
+    running: root.pollingEnabled && !root.osdHandoverChecked
+    onTriggered: {
+      root.osdHandoverChecked = true
+      if (!osdHandoverProbe.running) {
+        root.osdHandoverProbeOutput = ""
+        osdHandoverProbe.running = true
+      }
+    }
+  }
 
   // The same read-only status used by Omarchy's recording indicator. One
   // probe serves every Notchi instance, including recordings started elsewhere.

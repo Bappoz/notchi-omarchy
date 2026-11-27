@@ -61,3 +61,17 @@ function powerEvent(previous, sample) {
     if (sample.plugged && sample.charging && !previous.charging && !previous.full) return "charging";
     return "";
 }
+
+function needsOsdHandover(plugins) {
+    if (!Array.isArray(plugins)) return false;
+    var notch = null;
+    var osd = null;
+    for (var i = 0; i < plugins.length; i++) {
+        var item = plugins[i];
+        if (!item || typeof item !== "object") continue;
+        if (item.id === "bappoz.notch") notch = item;
+        else if (item.id === "omarchy.osd") osd = item;
+    }
+    return Boolean(notch && notch.enabled === true && notch.clonedFrom === "omarchy.osd"
+        && osd && osd.enabled === true);
+}

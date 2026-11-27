@@ -19,7 +19,7 @@
 - O Notchi recebe o OSD de volume do Omarchy. Brilho, mídia e outras mensagens do sistema continuam em um OSD separado.
 - A ilha sinaliza câmera em uso, início e conclusão da carga e bateria a 20% ou menos. O HUD Bluetooth mostra o nome e a bateria quando fornecida pelo BlueZ e diferencia fones intra-auriculares de outros modelos.
 - O dock pode iniciar comandos de voz com o Superwhisper. A onda reage ao microfone, e o Cursor Buddy aponta para janelas reconhecidas. A gravação permanece acessível até a transcrição terminar.
-- Veja as [instruções de atualização](README.md#instalar-e-atualizar) para ativar a nova rota do OSD em instalações anteriores.
+- Em atualizações a partir de 0.6.3 ou anterior, a ativação da rota do OSD é concluída automaticamente após `omarchy plugin update bappoz.notch`, sem comandos manuais adicionais.
 
 ## 0.6.1–0.6.3
 

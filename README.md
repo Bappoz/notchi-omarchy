@@ -122,12 +122,7 @@ Para uma instalação feita com `omarchy plugin add`, execute:
 omarchy plugin update bappoz.notch
 ```
 
-O gerenciador busca a branch padrão no GitHub, mostra o diff e pede confirmação. Se estiver migrando de 0.6.3 ou anterior, carregue a nova entrada do OSD e ative a substituição uma vez:
-
-```sh
-omarchy restart shell
-omarchy plugin enable bappoz.notch
-```
+O gerenciador busca a branch padrão no GitHub, mostra o diff, pede confirmação e recarrega o plugin automaticamente. Nenhum comando manual adicional é necessário após a atualização: ao migrar de 0.6.3 ou anterior, o próprio plugin detecta se `omarchy.osd` ainda está ativo em paralelo e conclui uma única vez a ativação da substituição do OSD pela IPC oficial do Omarchy, preservando a posição do widget na barra.
 
 O volume vai para o Notchi. Brilho, mídia e outros avisos do sistema mantêm um OSD separado. Se a instalação foi feita copiando arquivos e o comando disser que a pasta não é um checkout Git, remova essa cópia com `omarchy plugin remove bappoz.notch`. O Omarchy guarda instalações manuais numa pasta de backup. Em seguida, use o comando de primeira instalação. Em um checkout com alterações locais, preserve suas mudanças antes de atualizar.
 
